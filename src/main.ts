@@ -15,7 +15,6 @@ import { render, renderCareerModal, setActiveTab, markLanded, setDiceClickHandle
 import { renderDice } from './ui/dice';
 import { TOKEN_AVATARS } from './ui/tokens';
 import { ensureAudio, floatCash, flyingCash, isMuted, popup, sfx, toast, toggleMute, tokenSfx } from './ui/fx';
-import { isMusicPlaying, toggleMusic, initMusicFromPreferences } from './ui/music';
 import { setLang, t } from './ui/i18n';
 import {
   createOnlineRoom, joinOnlineRoom, broadcastMessage, sendToHost,
@@ -402,18 +401,9 @@ setDiceClickHandler(() => {
   }
 });
 
-function updateMusicButton(): void {
-  const musicBtn = document.getElementById('btn-music');
-  if (musicBtn) {
-    musicBtn.textContent = isMusicPlaying() ? '🎵 Music: ON' : '🔇 Music: OFF';
-    musicBtn.classList.toggle('active', isMusicPlaying());
-  }
-}
-
 function refreshHeader(): void {
   const muteBtn = document.getElementById('btn-mute')!;
   muteBtn.textContent = isMuted() ? '🔇' : '🔊';
-  updateMusicButton();
   document.getElementById('lbl-round')!.textContent = t('round');
   document.getElementById('subtitle-line')!.textContent = t('subtitle');
   document.getElementById('lbl-tycoons')!.textContent = t('tycoons');
@@ -436,7 +426,6 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('#topbar .lang-to
   });
 }
 document.getElementById('btn-mute')!.addEventListener('click', () => { toggleMute(); refreshHeader(); });
-document.getElementById('btn-music')?.addEventListener('click', () => { toggleMusic(); updateMusicButton(); });
 document.addEventListener('pointerdown', ensureAudio);
 
 const careerModal = document.getElementById('modal-career');
@@ -1010,38 +999,6 @@ document.getElementById('home-btn-start-solo')?.addEventListener('click', () => 
   toast('🎲 Solo match vs AI started!', 'emerald');
 });
 
-document.getElementById('home-btn-quick-play')?.addEventListener('click', () => {
-  ensureAudio();
-  sfx('click');
-
-  const hostName = (document.getElementById('home-host-name') as HTMLInputElement)?.value.trim() || 'Navindu';
-  const botNames = ['Sunil (Tuk Tycoon)', 'Anura (Tea Planter)', 'Kamal (Harbor Mogul)'];
-  const tokenKeys: TokenKey[] = ['elephant', 'train', 'gem'];
-
-  myPlayerId = 0;
-  setLocalPlayerId(0);
-
-  const players: PlayerSetup[] = [
-    { name: hostName, kind: 'human', persona: 'opportunist', tokenKey: myTokenKey },
-    { name: botNames[0], kind: 'bot', persona: 'aggressive', tokenKey: tokenKeys[0] },
-    { name: botNames[1], kind: 'bot', persona: 'conservative', tokenKey: tokenKeys[1] },
-    { name: botNames[2], kind: 'bot', persona: 'opportunist', tokenKey: tokenKeys[2] },
-  ];
-
-  S = createGame({
-    players,
-    seed: (Date.now() % 2147483647) | 0,
-    maxRounds: 25,
-    startingCash: 30000,
-  });
-
-  showView('game');
-  render(S, handlers, myPlayerId);
-  resetTurnTimer();
-  scheduleBot();
-  toast('⚡ Instant Match Started! Have fun!', 'emerald');
-});
-
 // ─── Keyboard Shortcuts (Space / Enter / Escape) ──────────────────────────
 
 window.addEventListener('keydown', (e) => {
@@ -1176,7 +1133,6 @@ function initRulesModal(): void {
 
 refreshHeader();
 initRulesModal();
-initMusicFromPreferences();
 
 const urlParams = new URLSearchParams(window.location.search);
 const roomParam = urlParams.get('room');

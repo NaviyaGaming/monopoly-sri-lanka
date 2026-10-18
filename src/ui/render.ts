@@ -407,66 +407,7 @@ function renderHubCard(s: GameState, h: Handlers): void {
     }
   }
 
-  const hint = computeSmartHint(s, p, isMyTurn);
-  if (hint && card) {
-    const hintDiv = document.createElement('div');
-    hintDiv.className = 'smart-assistant-hint';
-    hintDiv.innerHTML = `<span class="hint-pulse"></span><span>${hint}</span>`;
-    card.prepend(hintDiv);
-  }
-
   updateMobileActionDock(s, h);
-}
-
-function computeSmartHint(s: GameState, p: Player, isMyTurn: boolean): string | null {
-  if (!isMyTurn || p.bankrupt) return null;
-  if (s.phase === 'preRoll') {
-    if (p.inJail) return '⚖️ CID Inquiry: Roll doubles to escape free, or pay LKR 500 bail.';
-    return null;
-  }
-  if (s.phase === 'decideBuy') {
-    const bi = s.pendingBuy;
-    if (bi !== null && bi !== undefined) {
-      const def = BOARD[bi];
-      const price = squareValue(s, bi);
-      if (p.cash >= price) {
-        if (def.group && ownsMonopoly(s, p.id, def.group)) {
-          return `🌟 Buying this completes your ${GROUPS[def.group].name} Monopoly!`;
-        }
-        return `💡 Tip: Buying ${def.name} builds passive income whenever others land on it.`;
-      } else {
-        return `⚠️ Insufficient cash to buy at list price. Passing will start an auction.`;
-      }
-    }
-  }
-  if (s.phase === 'postRoll') {
-    if (s.hasBonusRoll) return '🎲 Doubles bonus! You rolled doubles — roll again!';
-    // Check if player has complete monopoly and can build
-    for (let i = 0; i < s.squares.length; i++) {
-      const st = s.squares[i];
-      if (st.owner === p.id) {
-        const def = BOARD[i];
-        if (def.group && ownsMonopoly(s, p.id, def.group) && st.buildings < 5 && p.cash >= buildCostOf(s, i)) {
-          return `💡 You hold the ${GROUPS[def.group].name} monopoly! Tap Deed tab to build houses.`;
-        }
-      }
-    }
-    // Check if player has damaged property
-    for (let i = 0; i < s.squares.length; i++) {
-      const st = s.squares[i];
-      if (st.owner === p.id && st.damaged && p.cash >= 800) {
-        return `⚠️ ${BOARD[i].name} is storm-damaged! Repair for LKR 800 to restore rent.`;
-      }
-    }
-    // Check if player has unshielded expensive property
-    for (let i = 0; i < s.squares.length; i++) {
-      const st = s.squares[i];
-      if (st.owner === p.id && st.shield === 0 && (BOARD[i].price ?? 0) >= 2000 && p.cash >= 1000) {
-        return `🛡️ Tip: Shield ${BOARD[i].name} in Shield tab before disaster strikes!`;
-      }
-    }
-  }
-  return null;
 }
 
 function updateMobileActionDock(s: GameState, h: Handlers): void {
