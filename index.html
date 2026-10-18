@@ -6,8 +6,8 @@
   <title>POLA: Monopoly Sri Lanka — Property, Banking & Insurance Board Game</title>
   <meta name="theme-color" content="#064e3b" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛺</text></svg>" />
-  <script type="module" crossorigin src="./assets/index-D4aKawIR.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-X1d1cPfv.css">
+  <script type="module" crossorigin src="./assets/index-DMUa81-g.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cg7rQoks.css">
 </head>
 <body class="min-h-screen">
   <header id="topbar">
@@ -43,6 +43,23 @@
   </header>
 
   <main id="layout">
+    <!-- Richup.io Style Left Live Chat & Activity Stream -->
+    <aside id="chat-panel">
+      <div class="chat-header">
+        <span class="chat-title">💬 Island Gazette & Chat</span>
+        <button class="btn tiny" id="btn-copy-room-link" title="Share invite link">🔗 Share Link</button>
+      </div>
+      <div id="live-chat-messages">
+        <div class="chat-msg system">
+          <span class="msg-author">🏛️ Central Bank:</span> Welcome to POLA Sri Lanka! Roll doubles for extra turns.
+        </div>
+      </div>
+      <form id="chat-form" class="chat-input-row">
+        <input id="chat-input" placeholder="Say something in chat..." maxlength="120" autocomplete="off" />
+        <button type="submit" class="btn-chat-send" title="Send">➤</button>
+      </form>
+    </aside>
+
     <div id="board-wrap">
       <div id="board-grid"></div>
     </div>
