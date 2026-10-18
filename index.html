@@ -6,8 +6,8 @@
   <title>POLA: Monopoly Sri Lanka — Free Online Multiplayer Board Game</title>
   <meta name="theme-color" content="#064e3b" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛺</text></svg>" />
-  <script type="module" crossorigin src="./assets/index-BOFOYrU9.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DJu6l9c2.css">
+  <script type="module" crossorigin src="./assets/index-Bbs6pKWV.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DdAxXk9o.css">
 </head>
 <body class="min-h-screen">
   <!-- ─── TOPBAR ───────────────────────────────────────────── -->
@@ -36,13 +36,15 @@
 
     <div class="topbar-actions">
       <button class="btn tiny gold" id="btn-open-rules" title="How to Play in 30 Seconds">📖 Rules</button>
+      <button class="btn tiny emerald" id="btn-open-career" title="View Lifetime Tycoon Career">🎖️ Career</button>
+      <button class="btn tiny" id="btn-music" title="Toggle Ceylon Island Ambient Music">🎵 Music</button>
       <button class="btn tiny danger" id="btn-leave-game" style="display: none;">🏠 Exit to Home</button>
       <div class="lang-toggle" role="group" aria-label="Language">
         <button id="btn-lang-en" data-lang="en" class="active">EN</button>
         <button id="btn-lang-si" data-lang="si">සිං</button>
         <button id="btn-lang-ta" data-lang="ta">தமிழ்</button>
       </div>
-      <button id="btn-mute" title="Toggle sound">🔊</button>
+      <button id="btn-mute" title="Toggle sound SFX">🔊</button>
     </div>
   </header>
 
@@ -368,6 +370,34 @@
         <div class="rules-footer-buttons">
           <button class="btn small" id="rules-prev-btn" disabled>◀ Previous</button>
           <button class="btn small primary" id="rules-next-btn">Next Step ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── MODAL: TYCOON CAREER & RANKS ─────────────────── -->
+  <div id="modal-career" class="rules-modal-backdrop hidden">
+    <div class="rules-modal-dialog career-dialog">
+      <div class="rules-modal-header">
+        <div class="rules-title-group">
+          <span class="rules-badge">TYCOON RECORD</span>
+          <h2>🎖️ Career Stats & Island Rank</h2>
+        </div>
+        <button class="rules-close-btn" id="btn-close-career" title="Close Career Modal">✕</button>
+      </div>
+
+      <div class="career-rank-hero" id="career-rank-card">
+        <!-- Injected via render -->
+      </div>
+
+      <div class="career-stats-grid" id="career-stats-summary">
+        <!-- Injected via render -->
+      </div>
+
+      <div class="career-history-section">
+        <h3>📜 Recent Matches</h3>
+        <div class="career-history-list" id="career-history-list">
+          <!-- Injected via render -->
         </div>
       </div>
     </div>
