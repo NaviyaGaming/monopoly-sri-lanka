@@ -6,8 +6,8 @@
   <title>POLA: Monopoly Sri Lanka — Free Online Multiplayer Board Game</title>
   <meta name="theme-color" content="#064e3b" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛺</text></svg>" />
-  <script type="module" crossorigin src="./assets/index-Bbs6pKWV.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DdAxXk9o.css">
+  <script type="module" crossorigin src="./assets/index-C4YFv_-G.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DqMjsjz-.css">
 </head>
 <body class="min-h-screen">
   <!-- ─── TOPBAR ───────────────────────────────────────────── -->
@@ -54,6 +54,12 @@
       <div class="home-badge">🇱🇰 FREE ONLINE MULTIPLAYER BOARD GAME</div>
       <h1 class="home-title">POLA · MONOPOLY LK</h1>
       <p class="home-subtitle">The rich, strategic Sri Lankan property trading empire. Play with friends online or solo vs AI bots!</p>
+
+      <div class="home-quick-play-bar">
+        <button class="btn gold btn-quick-play" id="home-btn-quick-play">
+          ⚡ Instant Quick Play (1-Tap Solo vs AI)
+        </button>
+      </div>
 
       <div class="home-cards-grid">
         <!-- Card 1: Create Online Room -->
@@ -294,6 +300,18 @@
       </section>
     </aside>
   </main>
+
+  <!-- ─── MOBILE FLOATING ACTION DOCK (Thumb-Friendly Controls) ─ -->
+  <div id="mobile-action-dock" class="mobile-action-dock hidden"></div>
+
+  <!-- ─── MOBILE ONE-TAP TILE INSPECTION BOTTOM SHEET ────────── -->
+  <div id="mobile-tile-sheet" class="mobile-tile-sheet hidden">
+    <div class="sheet-scrim" id="sheet-scrim"></div>
+    <div class="sheet-container" id="sheet-container">
+      <div class="sheet-drag-handle"></div>
+      <div id="sheet-body-content"></div>
+    </div>
+  </div>
 
   <div id="overlay" class="hidden"></div>
   <div id="toast-container"></div>
