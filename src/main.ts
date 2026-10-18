@@ -10,10 +10,11 @@ import {
   unmortgageSquare, validTrade,
 } from './engine/engine';
 import { botAct, botConsiderTrade, botToAct } from './engine/bots';
-import { render, setActiveTab, markLanded, setDiceClickHandler, setLocalPlayerId, setTimerDisplay, type Handlers } from './ui/render';
+import { render, renderCareerModal, setActiveTab, markLanded, setDiceClickHandler, setLocalPlayerId, setTimerDisplay, type Handlers } from './ui/render';
 import { renderDice } from './ui/dice';
 import { TOKEN_AVATARS } from './ui/tokens';
 import { ensureAudio, floatCash, flyingCash, isMuted, popup, sfx, toast, toggleMute, tokenSfx } from './ui/fx';
+import { isMusicPlaying, toggleMusic, initMusicFromPreferences } from './ui/music';
 import { setLang, t } from './ui/i18n';
 import {
   createOnlineRoom, joinOnlineRoom, broadcastMessage, sendToHost,
@@ -396,11 +397,18 @@ setDiceClickHandler(() => {
   }
 });
 
-// ─── Header controls: language, mute, tabs ────────────────────────────────
+function updateMusicButton(): void {
+  const musicBtn = document.getElementById('btn-music');
+  if (musicBtn) {
+    musicBtn.textContent = isMusicPlaying() ? '🎵 Music: ON' : '🔇 Music: OFF';
+    musicBtn.classList.toggle('active', isMusicPlaying());
+  }
+}
 
 function refreshHeader(): void {
   const muteBtn = document.getElementById('btn-mute')!;
   muteBtn.textContent = isMuted() ? '🔇' : '🔊';
+  updateMusicButton();
   document.getElementById('lbl-round')!.textContent = t('round');
   document.getElementById('subtitle-line')!.textContent = t('subtitle');
   document.getElementById('lbl-tycoons')!.textContent = t('tycoons');
@@ -423,7 +431,21 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('#topbar .lang-to
   });
 }
 document.getElementById('btn-mute')!.addEventListener('click', () => { toggleMute(); refreshHeader(); });
+document.getElementById('btn-music')?.addEventListener('click', () => { toggleMusic(); updateMusicButton(); });
 document.addEventListener('pointerdown', ensureAudio);
+
+const careerModal = document.getElementById('modal-career');
+document.getElementById('btn-open-career')?.addEventListener('click', () => {
+  renderCareerModal();
+  sfx('cardflip');
+  careerModal?.classList.remove('hidden');
+});
+document.getElementById('btn-close-career')?.addEventListener('click', () => {
+  careerModal?.classList.add('hidden');
+});
+careerModal?.addEventListener('click', (e) => {
+  if (e.target === careerModal) careerModal.classList.add('hidden');
+});
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>('.tab-trigger')) {
   btn.addEventListener('click', () => {
@@ -1049,6 +1071,7 @@ function initRulesModal(): void {
 
 refreshHeader();
 initRulesModal();
+initMusicFromPreferences();
 
 const urlParams = new URLSearchParams(window.location.search);
 const roomParam = urlParams.get('room');

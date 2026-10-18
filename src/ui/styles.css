@@ -1816,4 +1816,463 @@ body {
   }
 }
 
+/* ─── Music Button Toggle Active State ───────────────────────────── */
+#btn-music.active {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #34d399;
+  color: #a7f3d0;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+/* ─── Interactive Visual Trade Desk ──────────────────────────────── */
+.visual-trade-desk {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.trade-partner-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.partner-pills-row {
+  display: flex;
+  gap: 6px;
+}
+.partner-pill {
+  background: rgba(10, 32, 24, 0.85);
+  border: 1px solid #1c4738;
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.partner-pill.active {
+  background: #143d2f;
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+}
+.partner-pill .p-cash {
+  color: #6ee7b7;
+  font-size: 9.5px;
+}
+.trade-grid-visual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.trade-shelf {
+  background: rgba(8, 26, 20, 0.7);
+  border: 1px solid #1c4738;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shelf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--gold);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+}
+.shelf-val {
+  font-size: 10.5px;
+  color: #6ee7b7;
+  font-weight: 700;
+}
+.trade-cash-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cash-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #061510;
+  border: 1px solid #1c4738;
+  border-radius: 8px;
+  padding: 3px 6px;
+}
+.cash-input-row input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  width: 100%;
+  outline: none;
+}
+.quick-cash-chips {
+  display: flex;
+  gap: 4px;
+}
+.chip-btn {
+  background: #0f3024;
+  border: 1px solid #1c4738;
+  color: #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 1;
+}
+.chip-btn:hover {
+  background: #194e3a;
+  color: #fff;
+}
+.chip-btn.clear {
+  flex: 0 0 20px;
+  color: #fb7185;
+}
+.shelf-items-label {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+.trade-props-scroller {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.empty-shelf {
+  font-size: 11px;
+  text-align: center;
+  padding: 16px 0;
+}
+.trade-deed-chip {
+  background: #0d261e;
+  border: 1px solid #1c4738;
+  border-radius: 8px;
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+.trade-deed-chip:hover {
+  background: #14382d;
+}
+.trade-deed-chip.selected {
+  border-color: var(--gold);
+  background: #232210;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+.chip-color-bar {
+  width: 5px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--dc, #10b981);
+}
+.chip-title {
+  font-size: 11px;
+  font-weight: 750;
+  color: #f8fafc;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip-price {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.chip-check {
+  font-size: 11px;
+  color: var(--gold);
+  font-weight: 900;
+}
+.trade-balance-pill {
+  text-align: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  border: 1px solid;
+}
+.trade-balance-pill.fair {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #a7f3d0;
+}
+.trade-balance-pill.generous {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: #38bdf8;
+  color: #bae6fd;
+}
+.trade-balance-pill.ambitious {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #fbbf24;
+  color: #fde68a;
+}
+.btn-propose-trade {
+  padding: 10px;
+  font-size: 13.5px;
+}
+
+/* ─── Net Worth Timeline Progression Graph & Accolades ───────────── */
+.game-over-dialog {
+  max-height: 90vh;
+  overflow-y: auto;
+  width: min(600px, 95vw);
+}
+.winner-line {
+  font-size: 14.5px;
+  color: #fef08a;
+  margin: 4px 0 12px;
+}
+.game-over-rank-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1.5px solid;
+  margin-bottom: 12px;
+  text-align: left;
+  background: rgba(10, 30, 22, 0.75);
+}
+.game-over-rank-banner .rank-icon {
+  font-size: 26px;
+}
+.game-over-rank-banner .rank-info b {
+  font-size: 14px;
+  color: #fff;
+}
+.chart-container {
+  background: rgba(6, 20, 15, 0.75);
+  border: 1px solid #1c4738;
+  border-radius: 14px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.chart-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.net-worth-svg {
+  width: 100%;
+  height: auto;
+  max-height: 170px;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+  font-size: 10.5px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #cbd5e1;
+}
+.legend-item .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.accolades-section {
+  margin: 12px 0;
+  text-align: left;
+}
+.section-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6ee7b7;
+  margin-bottom: 8px;
+}
+.accolades-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.accolade-card {
+  background: rgba(8, 25, 20, 0.7);
+  border: 1px solid #1c4738;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.acc-icon {
+  font-size: 22px;
+}
+.acc-info b {
+  font-size: 11.5px;
+  color: #fff;
+}
+.acc-sub {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+/* ─── Career Modal & Tycoon Prestige Ranks ───────────────────────── */
+.career-dialog {
+  width: min(560px, 95vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.career-rank-hero {
+  margin-bottom: 12px;
+}
+.rank-card-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 2px solid;
+  background: rgba(6, 22, 17, 0.85);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.rank-icon-big {
+  font-size: 42px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+}
+.rank-details .rank-lvl {
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+.rank-details h2 {
+  margin: 2px 0 4px;
+  font-size: 20px;
+  font-weight: 900;
+}
+.rank-details p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.rank-apprentice {
+  border-color: #34d399 !important;
+  color: #34d399;
+}
+.rank-landlord {
+  border-color: #38bdf8 !important;
+  color: #38bdf8;
+}
+.rank-tycoon {
+  border-color: #fbbf24 !important;
+  color: #fbbf24;
+}
+.rank-governor {
+  border-color: #c084fc !important;
+  color: #c084fc;
+  box-shadow: 0 0 20px rgba(192, 132, 252, 0.35);
+}
+.rank-tag {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid;
+  margin-right: 3px;
+}
+.career-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.career-stat-card {
+  background: rgba(8, 25, 20, 0.8);
+  border: 1px solid #1c4738;
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.career-stat-card .stat-num {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--gold);
+}
+.career-stat-card .stat-lbl {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.career-history-section h3 {
+  font-size: 13.5px;
+  color: #6ee7b7;
+  margin: 0 0 8px;
+}
+.career-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.match-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(8, 25, 20, 0.6);
+  border: 1px solid #1c4738;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+}
+.match-history-row.victory {
+  border-left: 3px solid #10b981;
+}
+.match-history-row.defeat {
+  border-left: 3px solid #f43f5e;
+}
+.match-res {
+  font-weight: 800;
+  font-size: 10.5px;
+}
+.match-history-row.victory .match-res { color: #34d399; }
+.match-history-row.defeat .match-res { color: #fb7185; }
+
+@media (max-width: 640px) {
+  .trade-grid-visual {
+    grid-template-columns: 1fr;
+  }
+  .accolades-grid {
+    grid-template-columns: 1fr;
+  }
+  .career-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
 

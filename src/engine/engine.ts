@@ -73,6 +73,17 @@ export function createGame(opts: { players: PlayerSetup[]; seed: number; maxRoun
     hasBonusRoll: false,
     log: [],
     winner: null,
+    matchStats: {
+      rentCollected: players.map(() => 0),
+      rentPaid: players.map(() => 0),
+      loansTaken: players.map(() => 0),
+      doublesRolled: players.map(() => 0),
+      shieldsBought: players.map(() => 0),
+    },
+    netWorthHistory: [{
+      round: 1,
+      values: players.map(() => startCash),
+    }],
   };
   s.communityDeck = shuffle(s, COMMUNITY_CARDS.map((_, i) => i));
   s.headlineDeck = shuffle(s, HEADLINE_CARDS.map((_, i) => i));
@@ -222,6 +233,7 @@ export function takeTurnRoll(s: GameState): void {
       return;
     }
     s.hasBonusRoll = true;
+    if (s.matchStats) s.matchStats.doublesRolled[p.id] = (s.matchStats.doublesRolled[p.id] || 0) + 1;
     log(s, `🎲 DOUBLES! ${p.name} gets a bonus roll after completing their turn!`, 'event');
   } else {
     s.consecutiveDoubles = 0;
@@ -282,6 +294,10 @@ export function resolveLanding(s: GameState): void {
           const rent = effectiveRent(s, idx, diceSum);
           log(s, `💸 ${p.name} paid LKR ${fmt(rent)} rent to ${owner.name} at ${def.name}.`, 'money');
           chargeCash(s, p.id, rent, { type: 'player', id: owner.id });
+          if (s.matchStats) {
+            s.matchStats.rentCollected[owner.id] = (s.matchStats.rentCollected[owner.id] || 0) + rent;
+            s.matchStats.rentPaid[p.id] = (s.matchStats.rentPaid[p.id] || 0) + rent;
+          }
         }
         goPostRoll(s);
       } else {
@@ -674,6 +690,7 @@ export function buyShield(s: GameState, idx: number, tier: 1 | 2 | 3): boolean {
   if (p.cash < cost) return false;
   p.cash -= cost;
   st.shield = tier;
+  if (s.matchStats) s.matchStats.shieldsBought[p.id] = (s.matchStats.shieldsBought[p.id] || 0) + 1;
   const label = tier === 3 ? 'Business Interruption Policy' : tier === 2 ? 'Comprehensive Insurance' : 'Basic Property Insurance';
   log(s, `🛡️ ${p.name} equipped ${label} on ${BOARD[idx].name} for LKR ${fmt(cost)}.`, 'money');
   return true;
@@ -704,6 +721,7 @@ export function takeLoan(s: GameState, amount: number, playerId?: number): boole
   p.cash += principal;
   p.loan = payback;
   p.loanRoundsLeft = LOAN_DURATION;
+  if (s.matchStats) s.matchStats.loansTaken[p.id] = (s.matchStats.loansTaken[p.id] || 0) + principal;
   s.squares.forEach((st, i) => {
     if (st.owner === p.id && BOARD[i].mortgageValue && !st.loanLocked && !st.mortgaged) st.loanLocked = true;
   });
@@ -860,6 +878,12 @@ function isOver(s: GameState): boolean {
 
 function processEndOfRound(s: GameState): void {
   s.round++;
+  if (s.netWorthHistory) {
+    s.netWorthHistory.push({
+      round: s.round,
+      values: s.players.map(pl => netWorth(s, pl.id)),
+    });
+  }
   if (s.round > s.maxRounds) {
     s.round = s.maxRounds;
     gameOverByWorth(s);

@@ -20,6 +20,7 @@ import { renderDice } from './dice';
 import { TOKEN_AVATARS } from './tokens';
 import { confetti } from './fx';
 import { cycleName, getLang, squareName, t } from './i18n';
+import { loadCareer, getTycoonRank, recordMatchResult } from '../engine/career';
 import './styles.css';
 
 export interface Handlers {
@@ -59,6 +60,12 @@ let localPlayerId: number | null = null;
 let currentTimerVal = 25;
 let currentTimerUrgent = false;
 let currentTimerVisible = false;
+
+let tradePartnerId: number | null = null;
+let tradeGiveSquare: number | null = null;
+let tradeWantSquare: number | null = null;
+let tradeGiveCash = 0;
+let tradeWantCash = 0;
 
 export function setTimerDisplay(seconds: number, urgent: boolean, visible: boolean): void {
   currentTimerVal = seconds;
@@ -422,12 +429,15 @@ function renderScoreboard(s: GameState, h: Handlers): void {
     const crown = !p.bankrupt && topNet > 0 && netWorth(s, p.id) === topNet ? ' 👑' : '';
     const youTag = isMe ? '<span class="you-badge">YOU</span>' : '';
     const badges = `${p.inJail ? '🚔' : ''}${p.loan > 0 ? `🏦${p.loanRoundsLeft}R` : ''}${p.bankrupt ? ' 💀' : ''}`;
+    const career = isMe ? loadCareer() : null;
+    const rank = career ? getTycoonRank(career) : null;
+    const rankTag = rank ? `<span class="rank-tag ${rank.borderClass}" title="${rank.desc}">${rank.badge} ${rank.title}</span>` : '';
     return `
       <div class="pcard${i === s.current && s.phase !== 'gameOver' ? ' current' : ''}${p.bankrupt ? ' bankrupt' : ''}${isMe ? ' is-me' : ''}" style="--pc:${p.color}">
         <span class="picon">${TOKENS[p.tokenKey].icon}</span>
         <div class="pinfo">
           <div class="pname">${p.name}${youTag}${crown} <span class="pbadges">${badges}</span></div>
-          <div class="psub">${p.kind === 'bot' ? PERSONAS[p.persona].label : (isMe ? 'You (Tycoon)' : 'Tycoon')} · ${props} props · Net LKR ${fmt(netWorth(s, p.id))}</div>
+          <div class="psub">${p.kind === 'bot' ? PERSONAS[p.persona].label : (isMe ? `${rankTag}` : 'Tycoon')} · ${props} props · Net LKR ${fmt(netWorth(s, p.id))}</div>
         </div>
         <div class="pcash">LKR ${fmt(p.cash)}</div>
       </div>
@@ -640,44 +650,200 @@ function renderTradeTab(s: GameState, h: Handlers): void {
     box.innerHTML = '<p class="dim note">No solvent partners available.</p>';
     return;
   }
+
+  if (tradePartnerId === null || !partners.some(x => x.id === tradePartnerId)) {
+    tradePartnerId = partners[0].id;
+    tradeWantSquare = null;
+    tradeWantCash = 0;
+  }
+
+  const partner = s.players[tradePartnerId];
   const myProps = s.squares.map((st, i) => ({ st, i })).filter(o => o.st.owner === p.id && !o.st.loanLocked && BOARD[o.i].price);
-  const theirProps = (pid: number) => s.squares.map((st, i) => ({ st, i })).filter(o => o.st.owner === pid && !o.st.loanLocked && BOARD[o.i].price);
+  const theirProps = s.squares.map((st, i) => ({ st, i })).filter(o => o.st.owner === partner.id && !o.st.loanLocked && BOARD[o.i].price);
+
+  const giveVal = (tradeGiveSquare !== null ? squareValue(s, tradeGiveSquare) : 0) + tradeGiveCash;
+  const wantVal = (tradeWantSquare !== null ? squareValue(s, tradeWantSquare) : 0) + tradeWantCash;
+  const diff = giveVal - wantVal;
+  const balanceLabel = Math.abs(diff) < 500
+    ? '⚖️ Fair & Balanced Deal'
+    : diff > 0
+      ? `🎁 Generous Offer (+LKR ${fmt(diff)} for ${partner.name})`
+      : `💎 Ambitious Request (+LKR ${fmt(-diff)} for You)`;
+  const balanceClass = Math.abs(diff) < 500 ? 'fair' : diff > 0 ? 'generous' : 'ambitious';
 
   box.innerHTML = `
-    <div class="field"><label>${t('tradePartner')}</label>
-      <select id="trade-partner">${partners.map(x => `<option value="${x.id}">${TOKENS[x.tokenKey].icon} ${x.name} (LKR ${fmt(x.cash)})</option>`).join('')}</select>
-    </div>
-    <div class="trade-cols">
-      <div class="trade-col offer">
-        <b>${t('youOffer')}</b>
-        <select id="trade-give-prop"><option value="">— property —</option>${myProps.map(o => `<option value="${o.i}">${BOARD[o.i].name}</option>`).join('')}</select>
-        <input id="trade-give-cash" type="number" min="0" step="250" value="0" />
+    <div class="visual-trade-desk">
+      <!-- Partner Selection Pills -->
+      <div class="trade-partner-picker">
+        <span class="dim">Partner:</span>
+        <div class="partner-pills-row">
+          ${partners.map(x => `
+            <button class="partner-pill ${x.id === tradePartnerId ? 'active' : ''}" data-pid="${x.id}">
+              <span class="p-icon">${TOKENS[x.tokenKey].icon}</span>
+              <b>${x.name}</b>
+              <span class="p-cash">LKR ${fmt(x.cash)}</span>
+            </button>
+          `).join('')}
+        </div>
       </div>
-      <div class="trade-col request">
-        <b>${t('youRequest')}</b>
-        <select id="trade-want-prop"><option value="">— property —</option>${theirProps(partners[0].id).map(o => `<option value="${o.i}">${BOARD[o.i].name}</option>`).join('')}</select>
-        <input id="trade-want-cash" type="number" min="0" step="250" value="0" />
-      </div>
-    </div>
-    <button class="btn gold" id="btn-propose-trade">🤝 ${t('proposeTrade')}</button>
-    <div class="dim note" id="trade-feedback"></div>`;
 
-  const partnerSel = document.getElementById('trade-partner') as HTMLSelectElement;
-  const wantProp = document.getElementById('trade-want-prop') as HTMLSelectElement;
-  partnerSel.addEventListener('change', () => {
-    const pid = Number(partnerSel.value);
-    const keep = wantProp.value;
-    wantProp.innerHTML = `<option value="">— property —</option>${theirProps(pid).map(o => `<option value="${o.i}">${BOARD[o.i].name}</option>`).join('')}`;
-    wantProp.value = keep;
+      <!-- Live Interactive Trading Floor -->
+      <div class="trade-grid-visual">
+        <!-- Left: Offering -->
+        <div class="trade-shelf offering">
+          <div class="shelf-head">
+            <b>Your Offer</b>
+            <span class="shelf-val">Val: LKR ${fmt(giveVal)}</span>
+          </div>
+
+          <div class="trade-cash-box">
+            <div class="cash-input-row">
+              <span class="cash-icon">💵</span>
+              <input type="number" id="trade-give-cash" min="0" max="${p.cash}" step="250" value="${tradeGiveCash}" placeholder="Cash amount" />
+            </div>
+            <div class="quick-cash-chips">
+              <button class="chip-btn" data-add-give="500">+500</button>
+              <button class="chip-btn" data-add-give="1000">+1k</button>
+              <button class="chip-btn" data-add-give="5000">+5k</button>
+              <button class="chip-btn clear" data-clear-give="1">✕</button>
+            </div>
+          </div>
+
+          <div class="shelf-items-label">Select Property to Offer:</div>
+          <div class="trade-props-scroller">
+            ${myProps.length === 0 ? '<div class="dim empty-shelf">No tradeable unpledged land</div>' : myProps.map(o => {
+              const def = BOARD[o.i];
+              const gcolor = def.group ? GROUPS[def.group].color : '#10b981';
+              const isSel = tradeGiveSquare === o.i;
+              return `
+                <div class="trade-deed-chip ${isSel ? 'selected' : ''}" data-give-sq="${o.i}" style="--dc:${gcolor}">
+                  <div class="chip-color-bar"></div>
+                  <div class="chip-title">${def.short}</div>
+                  <div class="chip-price">LKR ${fmt(squareValue(s, o.i))}</div>
+                  ${isSel ? '<span class="chip-check">✓</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Right: Requesting -->
+        <div class="trade-shelf requesting">
+          <div class="shelf-head">
+            <b>You Request</b>
+            <span class="shelf-val">Val: LKR ${fmt(wantVal)}</span>
+          </div>
+
+          <div class="trade-cash-box">
+            <div class="cash-input-row">
+              <span class="cash-icon">💵</span>
+              <input type="number" id="trade-want-cash" min="0" max="${partner.cash}" step="250" value="${tradeWantCash}" placeholder="Cash amount" />
+            </div>
+            <div class="quick-cash-chips">
+              <button class="chip-btn" data-add-want="500">+500</button>
+              <button class="chip-btn" data-add-want="1000">+1k</button>
+              <button class="chip-btn" data-add-want="5000">+5k</button>
+              <button class="chip-btn clear" data-clear-want="1">✕</button>
+            </div>
+          </div>
+
+          <div class="shelf-items-label">Select Partner's Land:</div>
+          <div class="trade-props-scroller">
+            ${theirProps.length === 0 ? '<div class="dim empty-shelf">Partner has no tradeable land</div>' : theirProps.map(o => {
+              const def = BOARD[o.i];
+              const gcolor = def.group ? GROUPS[def.group].color : '#10b981';
+              const isSel = tradeWantSquare === o.i;
+              return `
+                <div class="trade-deed-chip ${isSel ? 'selected' : ''}" data-want-sq="${o.i}" style="--dc:${gcolor}">
+                  <div class="chip-color-bar"></div>
+                  <div class="chip-title">${def.short}</div>
+                  <div class="chip-price">LKR ${fmt(squareValue(s, o.i))}</div>
+                  ${isSel ? '<span class="chip-check">✓</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Value Balance Meter -->
+      <div class="trade-balance-pill ${balanceClass}">
+        ${balanceLabel}
+      </div>
+
+      <button class="btn gold btn-large btn-propose-trade" id="btn-propose-trade">
+        🤝 Propose Trade Deal
+      </button>
+      <div class="dim note" id="trade-feedback"></div>
+    </div>
+  `;
+
+  // Attach event handlers
+  box.querySelectorAll<HTMLButtonElement>('.partner-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tradePartnerId = Number(btn.dataset.pid);
+      tradeWantSquare = null;
+      tradeWantCash = 0;
+      renderTradeTab(s, h);
+    });
   });
 
-  document.getElementById('btn-propose-trade')!.addEventListener('click', () => {
-    const partner = Number(partnerSel.value);
-    const giveSq = (document.getElementById('trade-give-prop') as HTMLSelectElement).value;
-    const wantSq = wantProp.value;
-    const giveCash = Math.max(0, Number((document.getElementById('trade-give-cash') as HTMLInputElement).value) || 0);
-    const wantCash = Math.max(0, Number((document.getElementById('trade-want-cash') as HTMLInputElement).value) || 0);
-    h.onTradeSubmit(partner, giveSq ? Number(giveSq) : null, giveCash, wantSq ? Number(wantSq) : null, wantCash);
+  box.querySelectorAll<HTMLElement>('[data-give-sq]').forEach(el => {
+    el.addEventListener('click', () => {
+      const sq = Number(el.dataset.giveSq);
+      tradeGiveSquare = tradeGiveSquare === sq ? null : sq;
+      renderTradeTab(s, h);
+    });
+  });
+
+  box.querySelectorAll<HTMLElement>('[data-want-sq]').forEach(el => {
+    el.addEventListener('click', () => {
+      const sq = Number(el.dataset.wantSq);
+      tradeWantSquare = tradeWantSquare === sq ? null : sq;
+      renderTradeTab(s, h);
+    });
+  });
+
+  const giveInput = document.getElementById('trade-give-cash') as HTMLInputElement;
+  giveInput?.addEventListener('input', () => {
+    tradeGiveCash = Math.min(p.cash, Math.max(0, Number(giveInput.value) || 0));
+  });
+
+  const wantInput = document.getElementById('trade-want-cash') as HTMLInputElement;
+  wantInput?.addEventListener('input', () => {
+    tradeWantCash = Math.min(partner.cash, Math.max(0, Number(wantInput.value) || 0));
+  });
+
+  box.querySelectorAll<HTMLButtonElement>('[data-add-give]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tradeGiveCash = Math.min(p.cash, tradeGiveCash + Number(btn.dataset.addGive));
+      renderTradeTab(s, h);
+    });
+  });
+
+  box.querySelectorAll<HTMLButtonElement>('[data-clear-give]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tradeGiveCash = 0;
+      renderTradeTab(s, h);
+    });
+  });
+
+  box.querySelectorAll<HTMLButtonElement>('[data-add-want]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tradeWantCash = Math.min(partner.cash, tradeWantCash + Number(btn.dataset.addWant));
+      renderTradeTab(s, h);
+    });
+  });
+
+  box.querySelectorAll<HTMLButtonElement>('[data-clear-want]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tradeWantCash = 0;
+      renderTradeTab(s, h);
+    });
+  });
+
+  document.getElementById('btn-propose-trade')?.addEventListener('click', () => {
+    h.onTradeSubmit(tradePartnerId!, tradeGiveSquare, tradeGiveCash, tradeWantSquare, tradeWantCash);
   });
 }
 
@@ -688,29 +854,248 @@ function renderLogTab(s: GameState): void {
   ).join('');
 }
 
+function generateNetWorthSvg(s: GameState): string {
+  const history = s.netWorthHistory;
+  if (!history || history.length < 2) return '';
+
+  const w = 460;
+  const h = 170;
+  const padL = 40;
+  const padR = 20;
+  const padT = 18;
+  const padB = 26;
+
+  const maxVal = Math.max(30000, ...history.flatMap(pt => pt.values));
+  const rounds = history.length;
+
+  const scaleX = (rIndex: number) => padL + (rIndex / (rounds - 1)) * (w - padL - padR);
+  const scaleY = (val: number) => padT + (1 - Math.max(0, val) / maxVal) * (h - padT - padB);
+
+  // Horizontal grid lines
+  const gridLines = [0, 0.5, 1].map(pct => {
+    const y = scaleY(maxVal * pct);
+    const valText = `${Math.round((maxVal * pct) / 1000)}k`;
+    return `
+      <line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3" />
+      <text x="${padL - 6}" y="${y + 3}" fill="#94a3b8" font-size="8.5" text-anchor="end">${valText}</text>
+    `;
+  }).join('');
+
+  // Polylines for each player
+  const linesHtml = s.players.map((p) => {
+    const pts = history.map((pt, i) => `${scaleX(i).toFixed(1)},${scaleY(pt.values[p.id] ?? 0).toFixed(1)}`).join(' ');
+    const lastX = scaleX(rounds - 1).toFixed(1);
+    const lastY = scaleY(history[rounds - 1].values[p.id] ?? 0).toFixed(1);
+    return `
+      <polyline points="${pts}" fill="none" stroke="${p.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="${p.bankrupt ? '0.35' : '0.95'}" />
+      <circle cx="${lastX}" cy="${lastY}" r="3.5" fill="${p.color}" />
+    `;
+  }).join('');
+
+  return `
+    <div class="chart-container">
+      <div class="chart-header">
+        <span class="chart-title">📈 Island Net Worth Timeline</span>
+        <span class="dim small">Round 1 ➔ Round ${history[rounds - 1].round}</span>
+      </div>
+      <svg viewBox="0 0 ${w} ${h}" class="net-worth-svg">
+        ${gridLines}
+        ${linesHtml}
+        <text x="${padL}" y="${h - 6}" fill="#64748b" font-size="8.5">R1</text>
+        <text x="${w - padR}" y="${h - 6}" fill="#64748b" font-size="8.5" text-anchor="end">R${history[rounds - 1].round}</text>
+      </svg>
+      <div class="chart-legend">
+        ${s.players.map(p => `
+          <span class="legend-item" style="--lc:${p.color}">
+            <span class="dot" style="background:${p.color}"></span>
+            ${p.name}: LKR ${fmt(netWorth(s, p.id))}
+          </span>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function generateAccoladesHtml(s: GameState): string {
+  if (!s.matchStats) return '';
+  const { rentCollected, loansTaken, doublesRolled, shieldsBought } = s.matchStats;
+
+  const maxRent = Math.max(...rentCollected);
+  const maxLoan = Math.max(...loansTaken);
+  const maxDoubles = Math.max(...doublesRolled);
+  const maxShield = Math.max(...shieldsBought);
+
+  const topRent = rentCollected.indexOf(maxRent);
+  const topLoan = loansTaken.indexOf(maxLoan);
+  const topDoubles = doublesRolled.indexOf(maxDoubles);
+  const topShield = shieldsBought.indexOf(maxShield);
+
+  return `
+    <div class="accolades-section">
+      <div class="section-title">🏆 Match Accolades & Records</div>
+      <div class="accolades-grid">
+        ${maxRent > 0 ? `
+          <div class="accolade-card">
+            <span class="acc-icon">🏰</span>
+            <div class="acc-info">
+              <b>Grand Landlord</b>
+              <div class="acc-sub">${s.players[topRent].name} · LKR ${fmt(maxRent)} rent</div>
+            </div>
+          </div>
+        ` : ''}
+        ${maxLoan > 0 ? `
+          <div class="accolade-card">
+            <span class="acc-icon">🏦</span>
+            <div class="acc-info">
+              <b>Serendib VIP</b>
+              <div class="acc-sub">${s.players[topLoan].name} · LKR ${fmt(maxLoan)} credit</div>
+            </div>
+          </div>
+        ` : ''}
+        ${maxDoubles > 0 ? `
+          <div class="accolade-card">
+            <span class="acc-icon">🎲</span>
+            <div class="acc-info">
+              <b>Lucky Roller</b>
+              <div class="acc-sub">${s.players[topDoubles].name} · ${maxDoubles} doubles</div>
+            </div>
+          </div>
+        ` : ''}
+        ${maxShield > 0 ? `
+          <div class="accolade-card">
+            <span class="acc-icon">🛡️</span>
+            <div class="acc-info">
+              <b>Disaster Prepared</b>
+              <div class="acc-sub">${s.players[topShield].name} · ${maxShield} policies</div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+export function renderCareerModal(): void {
+  const career = loadCareer();
+  const rank = getTycoonRank(career);
+  const winRate = career.matchesPlayed > 0 ? Math.round((career.matchesWon / career.matchesPlayed) * 100) : 0;
+
+  const rankCard = document.getElementById('career-rank-card');
+  if (rankCard) {
+    rankCard.innerHTML = `
+      <div class="rank-card-inner ${rank.borderClass}">
+        <div class="rank-icon-big">${rank.badge}</div>
+        <div class="rank-details">
+          <span class="rank-lvl">TYCOON RANK LEVEL ${rank.level}</span>
+          <h2>${rank.title}</h2>
+          <p class="dim">${rank.desc}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  const statsSummary = document.getElementById('career-stats-summary');
+  if (statsSummary) {
+    statsSummary.innerHTML = `
+      <div class="career-stat-card">
+        <span class="stat-num">${career.matchesWon}</span>
+        <span class="stat-lbl">Victories</span>
+      </div>
+      <div class="career-stat-card">
+        <span class="stat-num">${career.matchesPlayed}</span>
+        <span class="stat-lbl">Total Matches</span>
+      </div>
+      <div class="career-stat-card">
+        <span class="stat-num">${winRate}%</span>
+        <span class="stat-lbl">Win Rate</span>
+      </div>
+      <div class="career-stat-card">
+        <span class="stat-num">LKR ${fmt(career.totalRentCollected)}</span>
+        <span class="stat-lbl">Rent Collected</span>
+      </div>
+      <div class="career-stat-card">
+        <span class="stat-num">LKR ${fmt(career.highestNetWorth)}</span>
+        <span class="stat-lbl">Peak Net Worth</span>
+      </div>
+    `;
+  }
+
+  const historyList = document.getElementById('career-history-list');
+  if (historyList) {
+    if (career.history.length === 0) {
+      historyList.innerHTML = '<p class="dim note">No matches played yet. Start a match to forge your island empire!</p>';
+    } else {
+      historyList.innerHTML = career.history.map(m => `
+        <div class="match-history-row ${m.won ? 'victory' : 'defeat'}">
+          <span class="match-res">${m.won ? '🏆 VICTORY' : '💀 DEFEAT'}</span>
+          <span class="match-worth">Net: LKR ${fmt(m.netWorth)}</span>
+          <span class="match-rent">Rent: LKR ${fmt(m.rentCollected)}</span>
+          <span class="match-date dim">${m.date}</span>
+        </div>
+      `).join('');
+    }
+  }
+}
+
 // ─── Overlays: auction, trade confirm, game over ─────────────────────────
+
+let hasRecordedCareerThisMatch = false;
 
 function renderOverlay(s: GameState, h: Handlers): void {
   const ov = el('overlay');
 
   if (s.phase === 'gameOver') {
     const standings = s.players.filter(p => !p.bankrupt).sort((a, b) => netWorth(s, b.id) - netWorth(s, a.id));
+
+    // Record career progression once per match
+    if (!hasRecordedCareerThisMatch) {
+      hasRecordedCareerThisMatch = true;
+      const me = localPlayerId !== null ? s.players[localPlayerId] : s.players[0];
+      const isWinner = s.winner === me.id;
+      const myNet = netWorth(s, me.id);
+      const myRent = s.matchStats ? (s.matchStats.rentCollected[me.id] || 0) : 0;
+      recordMatchResult(isWinner, myNet, myRent);
+    }
+
+    const career = loadCareer();
+    const rank = getTycoonRank(career);
+
     ov.classList.remove('hidden');
     ov.innerHTML = `
-      <div class="dialog pop">
+      <div class="dialog pop game-over-dialog">
         <div class="studio">POLA : MONOPOLY SRI LANKA</div>
         <h1>${t('champion')}</h1>
-        <p>${s.winner !== null ? `<strong>${s.players[s.winner].name}</strong> takes the island with LKR ${fmt(netWorth(s, s.winner))}.` : 'Everyone went bankrupt — the bank wins.'}</p>
+        <p class="winner-line">${s.winner !== null ? `👑 <strong>${s.players[s.winner].name}</strong> dominates the island with LKR ${fmt(netWorth(s, s.winner))}!` : 'Everyone went bankrupt — the bank wins.'}</p>
+
+        <!-- Career Rank Banner -->
+        <div class="game-over-rank-banner ${rank.borderClass}">
+          <span class="rank-icon">${rank.badge}</span>
+          <div class="rank-info">
+            <b>Your Rank: ${rank.title}</b>
+            <div class="dim small">${career.matchesWon} Wins · ${career.matchesPlayed} Matches (${career.matchesPlayed > 0 ? Math.round((career.matchesWon / career.matchesPlayed) * 100) : 0}% Win Rate)</div>
+          </div>
+        </div>
+
         <div class="standings">${standings.map((p, i) => `
           <div class="standing-row${i === 0 ? ' winner' : ''}">
             <span><span class="rank">#${i + 1}</span> ${TOKENS[p.tokenKey].icon} ${p.name}</span>
             <span>LKR ${fmt(netWorth(s, p.id))}</span>
           </div>`).join('')}</div>
-        ${s.players.some(p => p.bankrupt) ? `<p class="dim">Fell along the way: ${s.players.filter(p => p.bankrupt).map(p => p.name).join(', ')}.</p>` : ''}
-        <button class="btn gold" id="btn-restart">${t('playAgain')}</button>
+
+        <!-- 📈 Net Worth Timeline Progression Graph -->
+        ${generateNetWorthSvg(s)}
+
+        <!-- 🏆 Match Accolades -->
+        ${generateAccoladesHtml(s)}
+
+        ${s.players.some(p => p.bankrupt) ? `<p class="dim fell-along">Fell along the way: ${s.players.filter(p => p.bankrupt).map(p => p.name).join(', ')}.</p>` : ''}
+        <button class="btn gold btn-large" id="btn-restart">${t('playAgain')}</button>
       </div>`;
     confetti(ov);
-    bind('btn-restart', h.onRestart);
+    bind('btn-restart', () => {
+      hasRecordedCareerThisMatch = false;
+      h.onRestart();
+    });
   }
 
   if (s.phase === 'auction') {

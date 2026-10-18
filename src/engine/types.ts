@@ -124,6 +124,14 @@ export interface GameState {
   hasBonusRoll: boolean;           // rolled doubles, can roll again
   log: LogEntry[];
   winner: number | null;
+  matchStats?: {
+    rentCollected: number[];
+    rentPaid: number[];
+    loansTaken: number[];
+    doublesRolled: number[];
+    shieldsBought: number[];
+  };
+  netWorthHistory?: { round: number; values: number[] }[];
 }
 
 export interface PlayerSetup {
