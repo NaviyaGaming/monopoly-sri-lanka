@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POLA: Monopoly Sri Lanka — Property, Banking & Insurance Board Game</title>
+  <meta name="theme-color" content="#064e3b" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛺</text></svg>" />
+  <script type="module" crossorigin src="./assets/index-50qt6K3-.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-2e1ElRJv.css">
+</head>
+<body class="min-h-screen">
+  <header id="topbar">
+    <div class="brand">
+      <div class="logo-badge">🛺</div>
+      <div>
+        <div class="brand-row">
+          <h1>POLA : MONOPOLY LK</h1>
+          <span class="proto-tag">SRI LANKA</span>
+        </div>
+        <p id="subtitle-line">Sri Lankan Strategic Property, Banking & Insurance Board Game</p>
+      </div>
+    </div>
+
+    <div class="hdr-pills">
+      <div class="pill"><span class="dim" id="lbl-round">Round</span> <b id="hdr-round">1 / 25</b></div>
+      <div class="pill amber" title="Macro-Economic Cycle shifts every 5 rounds">
+        <span id="hdr-cycle-icon">☀️</span>
+        <b id="hdr-cycle-name">Stable Island Economy</b>
+        <span class="timer" id="hdr-cycle-timer">5R left</span>
+      </div>
+      <div class="pill teal"><span>🪷</span> <span class="dim">Poya Pool:</span> <b id="hdr-poya-pool">LKR 1,000</b></div>
+    </div>
+
+    <div class="hdr-actions">
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button id="btn-lang-en" data-lang="en" class="active">EN</button>
+        <button id="btn-lang-si" data-lang="si">සිං</button>
+        <button id="btn-lang-ta" data-lang="ta">தமிழ்</button>
+      </div>
+      <button id="btn-mute" title="Toggle sound">🔊</button>
+    </div>
+  </header>
+
+  <main id="layout">
+    <div id="board-wrap">
+      <div id="board-grid"></div>
+    </div>
+
+    <aside id="side">
+      <section id="scoreboard-panel">
+        <div class="panel-head"><h2 id="lbl-tycoons">Island Tycoons (Live Net Worth)</h2></div>
+        <div id="players-scoreboard"></div>
+      </section>
+
+      <section id="desk-panel">
+        <div class="tab-strip">
+          <button id="tab-btn-deed" class="tab-trigger active">🏠 <span id="lbl-tab-deed">Deed</span></button>
+          <button id="tab-btn-bank" class="tab-trigger">🏦 <span id="lbl-tab-bank">Bank</span></button>
+          <button id="tab-btn-insure" class="tab-trigger">🛡️ <span id="lbl-tab-insure">Shield</span></button>
+          <button id="tab-btn-trade" class="tab-trigger">🤝 <span id="lbl-tab-trade">Trade</span></button>
+          <button id="tab-btn-log" class="tab-trigger">📜 <span id="lbl-tab-log">Log</span></button>
+        </div>
+        <div id="tab-panel-deed" class="tab-panel"><div id="deed-content"></div></div>
+        <div id="tab-panel-bank" class="tab-panel hidden">
+          <div class="panel-head-row">
+            <h3>🏦 Bank of Serendib Credit Desk</h3>
+            <span class="pill amber" id="bank-rate-pill">15% Flat</span>
+          </div>
+          <div id="bank-content"></div>
+        </div>
+        <div id="tab-panel-insure" class="tab-panel hidden">
+          <h3>🛡️ Disaster Shields & Upgrades</h3>
+          <div id="insure-content"></div>
+        </div>
+        <div id="tab-panel-trade" class="tab-panel hidden">
+          <h3>🤝 Island Trade Desk</h3>
+          <div id="trade-content"></div>
+        </div>
+        <div id="tab-panel-log" class="tab-panel hidden">
+          <div class="panel-head-row"><h3>📜 Island Gazette</h3></div>
+          <div id="log-content"></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="overlay" class="hidden"></div>
+  <div id="toast-container"></div>
+
+</body>
+</html>
