@@ -229,11 +229,25 @@ body {
 }
 .hub-middle {
   flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; min-height: 0; position: relative;
+  gap: 6px; min-height: 0; position: relative; width: 100%;
+}
+.hub-middle.has-card .dice-row,
+.hub-middle:has(.ctx-card) .dice-row,
+.dice-row.compact {
+  min-height: 48px;
+}
+.hub-middle.has-card .dice-arena-3d,
+.hub-middle:has(.ctx-card) .dice-arena-3d,
+.dice-arena-3d.compact {
+  transform: scale(0.68);
+  transform-origin: center center;
+  padding: 0;
+  gap: 16px;
 }
 .dice-row {
   display: flex; align-items: center; justify-content: center;
   min-height: 80px; width: 100%;
+  transition: min-height 0.2s ease;
 }
 .dice-arena-3d {
   display: inline-flex; gap: 28px; align-items: center; justify-content: center;
@@ -269,7 +283,7 @@ body {
   50% { box-shadow: 0 4px 26px rgba(245, 158, 11, 0.75); }
 }
 .btn-roll-hero .roll-icon { font-size: 17px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
-#popups { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 20px; }
+#popups { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 0; }
 .floating-delta {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 12px; border-radius: 999px; border: 2px solid;
@@ -289,12 +303,13 @@ body {
 }
 
 /* Contextual hub cards */
-.hub-card { width: 100%; max-width: 380px; min-height: 30px; }
+.hub-card { width: 100%; max-width: 380px; min-height: 20px; display: flex; justify-content: center; }
 .ctx-card {
   background: #0d2b21ee; border: 1px solid var(--line);
-  border-radius: 12px; padding: 8px 11px; font-size: 12px; text-align: left;
+  border-radius: 12px; padding: 7px 10px; font-size: 11.5px; text-align: left;
   display: flex; flex-direction: column; gap: 3px;
   animation: popCardIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  box-sizing: border-box; width: 100%;
 }
 @keyframes popCardIn {
   from { opacity: 0; transform: translateY(6px) scale(0.96); }
@@ -313,9 +328,26 @@ body {
 .ctx-card.deed {
   padding: 0;
   overflow: hidden;
+  max-width: 320px;
+  margin: 0 auto;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.ctx-card.deed .deed-head {
+  padding: 5px 9px;
+  font-size: clamp(11px, 2.7vw, 13px);
+}
+.ctx-card.deed .deed-head .pill {
+  padding: 2px 7px;
+  font-size: 10.5px;
 }
 .ctx-card.deed .deed-body {
-  padding: 8px 11px;
+  padding: 5px 9px;
+  font-size: clamp(10px, 2.5vw, 11px);
+  gap: 2px;
+}
+.ctx-card.deed .perk {
+  font-size: 9.5px;
+  line-height: 1.25;
 }
 .deed-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -332,7 +364,37 @@ body {
 }
 .deed-body { display: flex; flex-direction: column; gap: 3px; }
 .deed-body .perk { font-size: 10px; }
-.hub-actions { flex: 0 0 auto; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.hub-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 340px;
+  margin: 0 auto;
+  z-index: 10;
+  box-sizing: border-box;
+}
+.hub-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 6px;
+  font-size: clamp(10.5px, 2.6vw, 12.5px);
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  border-radius: 9px;
+}
+.hub-actions .btn:only-child,
+.hub-actions .btn-roll-hero {
+  flex: 0 1 auto;
+  min-width: 150px;
+  padding: 9px 24px;
+  font-size: clamp(13px, 1.1vw, 15px);
+}
 
 /* ─── Buttons ────────────────────────────────────────────── */
 .btn {
@@ -849,3 +911,69 @@ body {
   #side { flex: 0 0 auto; width: 100%; }
   #board-grid { width: 100%; }
 }
+
+@media (max-width: 640px) {
+  #board-center {
+    padding: 5px 6px;
+    gap: 3px;
+  }
+  .hub-top {
+    margin-bottom: 1px;
+  }
+  .hub-title {
+    font-size: clamp(12px, 3.8vw, 17px);
+    letter-spacing: 0.05em;
+  }
+  .hub-cycle {
+    font-size: 8px;
+    padding: 1px 7px;
+    margin-top: 1px;
+  }
+  .dice-row {
+    min-height: 44px;
+  }
+  .dice-arena-3d {
+    transform: scale(0.65);
+    gap: 14px;
+    padding: 0;
+  }
+  .ctx-card {
+    padding: 4px 7px;
+    font-size: 10px;
+  }
+  .ctx-card.deed {
+    max-width: 270px;
+  }
+  .ctx-card.deed .deed-head {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+  .ctx-card.deed .deed-head .pill {
+    padding: 1px 5px;
+    font-size: 9px;
+  }
+  .ctx-card.deed .deed-body {
+    padding: 4px 7px;
+    font-size: 9.5px;
+    gap: 1px;
+  }
+  .ctx-card.deed .perk {
+    font-size: 8.5px;
+    line-height: 1.2;
+  }
+  .hub-actions {
+    gap: 4px;
+    max-width: 280px;
+  }
+  .hub-actions .btn {
+    padding: 7px 4px;
+    font-size: 10px;
+    border-radius: 8px;
+  }
+  .hub-actions .btn-roll-hero {
+    min-width: 120px;
+    padding: 8px 16px;
+    font-size: 12.5px;
+  }
+}
+

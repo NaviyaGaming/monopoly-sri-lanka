@@ -229,9 +229,15 @@ function renderBoard(s: GameState, h: Handlers): void {
 function renderHubCard(s: GameState, h: Handlers): void {
   const card = document.getElementById('hub-card');
   const actions = document.getElementById('hub-actions');
+  const hubMiddle = document.querySelector<HTMLElement>('.hub-middle');
+  const diceHolder = document.getElementById('dice-holder');
   if (!card || !actions) return;
   card.innerHTML = '';
   actions.innerHTML = '';
+
+  const hasCard = s.phase !== 'preRoll' && s.phase !== 'gameOver';
+  if (hubMiddle) hubMiddle.classList.toggle('has-card', hasCard);
+  if (diceHolder) diceHolder.classList.toggle('compact', hasCard);
 
   if (s.phase === 'gameOver') return;
 
@@ -281,8 +287,8 @@ function renderHubCard(s: GameState, h: Handlers): void {
           </div>
         </div>`;
       actions.innerHTML = `
-        <button class="btn primary" id="btn-buy" ${afford ? '' : 'disabled'}>🏠 ${t('buyProp')} — LKR ${fmt(price)}</button>
-        <button class="btn danger" id="btn-pass">${t('auctionInstead')}</button>`;
+        <button class="btn primary" id="btn-buy" ${afford ? '' : 'disabled'}>🏠 ${t('buyProp')} · LKR ${fmt(price)}</button>
+        <button class="btn danger" id="btn-pass">🔨 ${t('auctionInstead')}</button>`;
       bind('btn-buy', h.onBuy);
       bind('btn-pass', h.onPass);
       break;
