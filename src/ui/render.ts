@@ -650,30 +650,87 @@ function renderOverlay(s: GameState, h: Handlers): void {
     const isHumanBidder = bidder.kind === 'human';
     const nextMin = auctionNextAmount(s);
     const isLeader = a.leader !== null;
+    const gcolor = def.group ? GROUPS[def.group].color : '#10b981';
+
     ov.classList.remove('hidden');
-      ov.innerHTML = `
-        <div class="dialog auction">
-          <div class="auction-head">
-            <div><span class="badge">🔨 Public Property Auction</span><h3>${def.name}</h3></div>
-            <div class="right"><span class="dim">List value</span><b>LKR ${fmt(a.listPrice)}</b></div>
+    ov.innerHTML = `
+      <div class="dialog richup-auction">
+        <div class="richup-auction-title">🔨 Live Property Auction</div>
+
+        <div class="richup-auction-body">
+          <!-- Left side: Current Bidding & Actions -->
+          <div class="auction-left">
+            <div class="auction-target-name">
+              <span class="flag-icon">${def.group ? '🇱🇰' : '🏛️'}</span>
+              <h2>${def.name}</h2>
+            </div>
+
+            <div class="auction-bid-display">
+              <span class="dim">Current Bid</span>
+              <div class="current-bid-amount">LKR ${fmt(isLeader ? a.currentBid : a.opening)}</div>
+              <div class="auction-leader-pill">
+                ${isLeader ? `👑 Leader: <b>${s.players[a.leader!].name}</b>` : 'Opening bid'}
+              </div>
+            </div>
+
+            <div class="auction-timer-track">
+              <div class="auction-timer-fill"></div>
+            </div>
+
+            <div class="bidder-status-line">
+              ${isHumanBidder ? `⭐ <b>${bidder.name}</b>, your turn to bid!` : `⏳ Waiting for <b>${bidder.name}</b>...`}
+            </div>
+
+            ${isHumanBidder ? `
+              <div class="auction-bid-buttons">
+                <button class="btn btn-bid-choice" id="btn-bid-250" ${bidder.cash < nextMin ? 'disabled' : ''}>
+                  <div class="val">+LKR 250</div>
+                  <div class="sub-val">Total ${fmt(nextMin)}</div>
+                </button>
+                <button class="btn btn-bid-choice" id="btn-bid-500" ${bidder.cash < nextMin + 250 ? 'disabled' : ''}>
+                  <div class="val">+LKR 500</div>
+                  <div class="sub-val">Total ${fmt(nextMin + 250)}</div>
+                </button>
+                <button class="btn btn-bid-choice" id="btn-bid-1000" ${bidder.cash < nextMin + 750 ? 'disabled' : ''}>
+                  <div class="val">+LKR 1,000</div>
+                  <div class="sub-val">Total ${fmt(nextMin + 750)}</div>
+                </button>
+              </div>
+              <button class="btn danger btn-auction-pass" id="btn-auction-pass">${t('withdraw')}</button>
+            ` : ''}
           </div>
-          <div class="auction-bid">
-            <div><span class="dim">${isLeader ? 'Current highest bid' : 'Opening floor bid'}</span><div class="big gold">LKR ${fmt(isLeader ? a.currentBid : a.opening)}</div></div>
-            <div class="right"><span class="dim">Leading bidder</span><b>${isLeader ? `${TOKENS[s.players[a.leader!].tokenKey].icon} ${s.players[a.leader!].name}` : 'No bids yet'}</b></div>
+
+          <!-- Right side: Official Deed Card (Richup card preview) -->
+          <div class="auction-right">
+            <div class="richup-deed-card">
+              <div class="deed-header" style="background:${gcolor}">
+                <span>${def.name}</span>
+              </div>
+              <div class="deed-rents-list">
+                ${def.rents ? `
+                  <div class="rent-row"><span>Base rent</span><b>LKR ${fmt(def.rents[0])}</b></div>
+                  <div class="rent-row"><span>With 1 house</span><b>LKR ${fmt(def.rents[1])}</b></div>
+                  <div class="rent-row"><span>With 2 houses</span><b>LKR ${fmt(def.rents[2])}</b></div>
+                  <div class="rent-row"><span>With 3 houses</span><b>LKR ${fmt(def.rents[3])}</b></div>
+                  <div class="rent-row"><span>With 4 houses</span><b>LKR ${fmt(def.rents[4])}</b></div>
+                  <div class="rent-row hotel"><span>With Hotel</span><b>LKR ${fmt(def.rents[5])}</b></div>
+                ` : `<p class="dim">${def.desc ?? ''}</p>`}
+              </div>
+              <div class="deed-footer-stats">
+                <div><span>Price:</span> <b>LKR ${fmt(a.listPrice)}</b></div>
+                ${def.buildCost ? `<div><span>House:</span> <b>LKR ${fmt(def.buildCost)}</b></div>` : ''}
+              </div>
+            </div>
           </div>
-          <div class="dim note" id="auction-status">${isHumanBidder ? `Your turn to bid, ${bidder.name}! Minimum: LKR ${fmt(nextMin)}.` : `Waiting for ${bidder.name} to bid…`}</div>
-          ${isHumanBidder ? `
-            <div class="btnrow">
-              <button class="btn gold" id="btn-bid-250" ${bidder.cash < nextMin ? 'disabled' : ''}>Bid LKR ${fmt(nextMin)}</button>
-              <button class="btn" id="btn-bid-500" ${bidder.cash < nextMin + 250 ? 'disabled' : ''}>Bid +500</button>
-              <button class="btn danger" id="btn-auction-pass">${t('withdraw')}</button>
-            </div>` : ''}
-        </div>`;
-      bind('btn-bid-250', () => h.onBid(250));
-      bind('btn-bid-500', () => h.onBid(500));
-      bind('btn-auction-pass', h.onWithdraw);
-      return;
-    }
+        </div>
+      </div>`;
+
+    bind('btn-bid-250', () => h.onBid(250));
+    bind('btn-bid-500', () => h.onBid(500));
+    bind('btn-bid-1000', () => h.onBid(1000));
+    bind('btn-auction-pass', h.onWithdraw);
+    return;
+  }
 
   if (s.pendingTrade) {
     const o = s.pendingTrade;

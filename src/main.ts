@@ -264,6 +264,51 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('.tab-trigger')) 
   });
 }
 
+// ─── Live Chat & Activity Stream (Richup Style) ───────────────────────────
+
+function appendChatMessage(sender: string, text: string, isSelf = false, isSystem = false): void {
+  const container = document.getElementById('live-chat-messages');
+  if (!container) return;
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `chat-msg ${isSystem ? 'system' : isSelf ? 'self' : 'other'}`;
+  msgDiv.innerHTML = isSystem
+    ? `<span class="msg-author">${sender}:</span> ${text}`
+    : `<span class="msg-author">${sender}:</span> ${text}`;
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
+}
+
+const chatForm = document.getElementById('chat-form') as HTMLFormElement;
+const chatInput = document.getElementById('chat-input') as HTMLInputElement;
+
+chatForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text || !S) return;
+  const selfName = S.players[S.current].name;
+  appendChatMessage(selfName, text, true);
+  sfx('step');
+  chatInput.value = '';
+
+  const msgPayload = {
+    type: 'chat' as const,
+    sender: selfName,
+    text,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+
+  if (isOnlineHost()) broadcastMessage(msgPayload);
+  else if (isOnlineClient()) sendToHost(msgPayload);
+});
+
+document.getElementById('btn-copy-room-link')?.addEventListener('click', () => {
+  const url = window.location.href;
+  navigator.clipboard.writeText(url).then(() => {
+    toast('📋 Link copied to clipboard! Share with friends.', 'emerald');
+    sfx('cash');
+  });
+});
+
 refreshHeader();
 
 // ─── Game start ───────────────────────────────────────────────────────────
@@ -336,12 +381,15 @@ function start(): void {
           } else if (msg.type === 'emote' && S) {
             sfx('emote');
             popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+          } else if (msg.type === 'chat') {
+            appendChatMessage(msg.sender, msg.text, false);
+            broadcastMessage(msg); // re-broadcast to other players
           }
         }
       ).then((roomId) => {
         popup(`Room Created! Code: ${roomId}`, 'share with friends', 'emerald');
         const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-        prompt('Copy and share this Room URL with your friends to join directly:', shareUrl);
+        appendChatMessage('System', `Room ${roomId} created! Share this link with your friends: ${shareUrl}`, false, true);
       });
     } else if (cfg.onlineAction === 'join' && cfg.onlineRoomCode) {
       toast(`Connecting to room ${cfg.onlineRoomCode}...`, 'amber');
@@ -355,12 +403,15 @@ function start(): void {
             toast(`Connected to ${cfg.onlineRoomCode}!`, 'emerald');
             S = msg.state;
             render(S, handlers);
+            appendChatMessage('System', `Connected to room ${cfg.onlineRoomCode}!`, false, true);
           } else if (msg.type === 'state') {
             S = msg.state;
             render(S, handlers);
           } else if (msg.type === 'emote') {
             sfx('emote');
             popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+          } else if (msg.type === 'chat') {
+            appendChatMessage(msg.sender, msg.text, false);
           }
         }
       );
