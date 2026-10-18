@@ -113,4 +113,48 @@ export const TOKEN_AVATARS: Record<TokenKey, TokenAvatar> = {
         <circle cx="24" cy="24" r="2.8" fill="#0f172a" stroke="#cbd5e1" stroke-width="1"/>
       </svg>`,
   },
+  gem: {
+    key: 'gem',
+    icon: '💎',
+    sound: 'dancer',
+    names: { en: 'Ceylon Sapphire', si: 'නිල් මැණික', ta: 'இலங்கை நீலக்கல்' },
+    svg: (color) => `
+      <svg viewBox="0 0 36 36" class="token-svg">
+        <defs>
+          <radialGradient id="ped-gem" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#cffafe"/>
+            <stop offset="55%" stop-color="${color}"/>
+            <stop offset="100%" stop-color="#164e63"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="18" cy="30" rx="14" ry="5" fill="#022c22" opacity="0.7"/>
+        <path d="M4,26 C4,30 32,30 32,26 L32,29 C32,33 4,33 4,29 Z" fill="#b45309"/>
+        <ellipse cx="18" cy="26" rx="14" ry="4.5" fill="url(#ped-gem)" stroke="#fef08a" stroke-width="1.2"/>
+        <polygon points="12,12 24,12 28,17 18,25 8,17" fill="${color}" stroke="#ffffff" stroke-width="1.2"/>
+        <polygon points="15,12 21,12 24,17 18,25 12,17" fill="#67e8f9" opacity="0.85"/>
+        <polygon points="18,12 20,12 21,15 18,17 15,15" fill="#ffffff" opacity="0.9"/>
+      </svg>`,
+  },
+  ship: {
+    key: 'ship',
+    icon: '⛵',
+    sound: 'train',
+    names: { en: 'Ocean Clipper', si: 'සාගර යාත්‍රාව', ta: 'பெருங்கடல் கப்பல்' },
+    svg: (color) => `
+      <svg viewBox="0 0 36 36" class="token-svg">
+        <defs>
+          <radialGradient id="ped-shp" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#fed7aa"/>
+            <stop offset="55%" stop-color="${color}"/>
+            <stop offset="100%" stop-color="#7c2d12"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="18" cy="30" rx="14" ry="5" fill="#022c22" opacity="0.7"/>
+        <path d="M4,26 C4,30 32,30 32,26 L32,29 C32,33 4,33 4,29 Z" fill="#b45309"/>
+        <ellipse cx="18" cy="26" rx="14" ry="4.5" fill="url(#ped-shp)" stroke="#fef08a" stroke-width="1.2"/>
+        <path d="M10,21 L26,21 L23,26 L13,26 Z" fill="${color}" stroke="#ffffff" stroke-width="1"/>
+        <path d="M17,8 L17,21 L11,18 Z" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+        <path d="M18,6 L18,21 L25,18 Z" fill="#fef08a" stroke="#e2e8f0" stroke-width="0.8"/>
+      </svg>`,
+  },
 };

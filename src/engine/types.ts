@@ -4,7 +4,7 @@
 
 export type Persona = 'aggressive' | 'conservative' | 'risk' | 'opportunist';
 export type PlayerKind = 'human' | 'bot';
-export type TokenKey = 'tuktuk' | 'dancer' | 'elephant' | 'train';
+export type TokenKey = 'tuktuk' | 'dancer' | 'elephant' | 'train' | 'gem' | 'ship';
 export type Lang = 'en' | 'si' | 'ta';
 
 export interface Player {

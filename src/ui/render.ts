@@ -706,72 +706,195 @@ function renderOverlay(s: GameState, h: Handlers): void {
 export interface StartConfig {
   lineup: string;
   maxRounds: number;
+  playerCount: number;
   names: string[];
   tokens: string[];
+  onlineAction?: 'create' | 'join';
+  onlineRoomCode?: string;
 }
 
 export function showSetup(onStart: (cfg: StartConfig) => void): void {
   const ov = el('overlay');
   ov.classList.remove('hidden');
-  const seatCard = (n: number, defName: string, defToken: string) => `
-    <div class="seat-card seat-${n}">
-      <div class="seat-head">Seat ${n}</div>
-      <input class="seat-name" id="su-name-${n}" value="${defName}" maxlength="20" />
+
+  const defaultNames = ['Navindu', 'Kasun (AI)', 'Nimali (AI)', 'Roshan (AI)', 'Dilani (AI)', 'Chamari (AI)'];
+  const defaultTokens = ['tuktuk', 'elephant', 'train', 'dancer', 'gem', 'ship'];
+
+  const seatCard = (n: number) => `
+    <div class="seat-card seat-${n}" id="seat-box-${n}">
+      <div class="seat-head">Player ${n}</div>
+      <input class="seat-name" id="su-name-${n}" value="${defaultNames[n - 1]}" maxlength="20" />
       <select class="seat-token" id="su-token-${n}">
-        ${Object.values(TOKENS).map(tk => `<option value="${tk.key}" ${tk.key === defToken ? 'selected' : ''}>${tk.icon} ${tk.name}</option>`).join('')}
+        ${Object.values(TOKENS).map(tk => `<option value="${tk.key}" ${tk.key === defaultTokens[n - 1] ? 'selected' : ''}>${tk.icon} ${tk.name}</option>`).join('')}
       </select>
     </div>`;
+
   ov.innerHTML = `
     <div class="dialog pop setup">
-      <div class="studio">PIXALAI PRESENTS</div>
+      <div class="studio">PIXALAI & RICHUP STYLE MULTIPLAYER</div>
       <h1>🛺 POLA: MONOPOLY LK</h1>
-      <p>${t('subtitle')} — buy the island, bank the boom, shield the storms.</p>
-      <div class="field"><label>${t('lineup')}</label>
-        <select id="su-lineup">
-          <option value="1h3b" selected>1 Human + 3 AI Tycoons (Kasun, Nimali & Roshan)</option>
-          <option value="2h2b">2 Humans + 2 AI (pass & play with a friend)</option>
-          <option value="4h0b">4 Humans — Pass & Play</option>
-          <option value="0h4b">4 AI Tycoons — Spectator Simulation</option>
-        </select>
+      <p>${t('subtitle')}</p>
+
+      <div class="setup-tabs">
+        <button class="setup-tab-btn active" id="tab-btn-local">🎮 Local / AI Match</button>
+        <button class="setup-tab-btn" id="tab-btn-online">🌐 Online Rooms (Richup Style)</button>
       </div>
-      <div class="field"><label>${t('matchLength')}</label>
-        <select id="su-length">
-          <option value="25" selected>Standard Commercial Match · 25 Rounds</option>
-          <option value="15">Quick Blitz · 15 Rounds</option>
-          <option value="50">Island Marathon · 50 Rounds</option>
-        </select>
+
+      <div id="setup-panel-local">
+        <div class="field"><label>Number of Players (2 to 6 Players)</label>
+          <select id="su-count">
+            <option value="2">2 Players</option>
+            <option value="3">3 Players</option>
+            <option value="4" selected>4 Players (Classic)</option>
+            <option value="5">5 Players</option>
+            <option value="6">6 Players (Full Island)</option>
+          </select>
+        </div>
+
+        <div class="field"><label>${t('lineup')}</label>
+          <select id="su-lineup">
+            <option value="1human" selected>1 Human + AI Bots</option>
+            <option value="allhumans">All Humans (Pass & Play with Friends)</option>
+            <option value="allbots">All AI Tycoons (Spectator)</option>
+          </select>
+        </div>
+
+        <div class="field"><label>${t('matchLength')}</label>
+          <select id="su-length">
+            <option value="25" selected>Standard Match · 25 Rounds</option>
+            <option value="15">Quick Blitz · 15 Rounds</option>
+            <option value="50">Island Marathon · 50 Rounds</option>
+          </select>
+        </div>
+
+        <div class="seats-grid" id="seats-container">
+          ${[1, 2, 3, 4, 5, 6].map(n => seatCard(n)).join('')}
+        </div>
+
+        <button class="btn gold btn-large" id="su-start">${t('startMatch')}</button>
       </div>
-      <div class="seats">
-        ${seatCard(1, 'You (Colombo)', 'tuktuk')}
-        ${seatCard(2, 'Nimali (Banker AI)', 'elephant')}
-        ${seatCard(3, 'Roshan (Risk AI)', 'train')}
-        ${seatCard(4, 'Dilani (Trader AI)', 'dancer')}
+
+      <div id="setup-panel-online" class="hidden">
+        <div class="online-box">
+          <div class="online-col create">
+            <h3>🔑 Create a Private Game</h3>
+            <p class="dim">Generate a shareable room code for you and your friends to join from anywhere.</p>
+            <div class="field"><label>Your Display Name</label>
+              <input id="online-host-name" value="Navindu" maxlength="18" />
+            </div>
+            <button class="btn gold" id="btn-create-room">✨ Create Room & Invite Link</button>
+          </div>
+
+          <div class="online-col join">
+            <h3>👥 Join a Friend's Room</h3>
+            <p class="dim">Enter the Room Code shared by your friend (e.g. <code>pola-k8b2</code>):</p>
+            <div class="field"><label>Room Code</label>
+              <input id="online-room-code" placeholder="pola-xxxx" />
+            </div>
+            <div class="field"><label>Your Display Name</label>
+              <input id="online-join-name" value="Player" maxlength="18" />
+            </div>
+            <button class="btn primary" id="btn-join-room">🚀 Join Room</button>
+          </div>
+        </div>
       </div>
-      <button class="btn gold" id="su-start">${t('startMatch')}</button>
     </div>`;
 
-  const lineup = document.getElementById('su-lineup') as HTMLSelectElement;
-  const refreshSeats = () => {
-    const mode = lineup.value;
-    for (let n = 1; n <= 4; n++) {
-      const card = document.getElementById(`su-name-${n}`) as HTMLInputElement;
-      if (!card) continue;
-      const humanSeats = mode === '1h3b' ? 1 : mode === '2h2b' ? 2 : mode === '4h0b' ? 4 : 0;
-      card.disabled = n > humanSeats;
-      if (mode === '1h3b' && n === 1) card.value = card.value.startsWith('You') ? 'You (Colombo)' : card.value;
+  const countSel = document.getElementById('su-count') as HTMLSelectElement;
+  const lineupSel = document.getElementById('su-lineup') as HTMLSelectElement;
+
+  const refreshVisibleSeats = () => {
+    const total = Number(countSel.value);
+    const lineup = lineupSel.value;
+    for (let n = 1; n <= 6; n++) {
+      const box = document.getElementById(`seat-box-${n}`);
+      const input = document.getElementById(`su-name-${n}`) as HTMLInputElement;
+      if (!box || !input) continue;
+      box.style.display = n <= total ? 'flex' : 'none';
+
+      if (lineup === '1human') {
+        input.disabled = n > 1;
+        if (n > 1 && !input.value.includes('(AI)')) input.value = `${defaultNames[n - 1]}`;
+      } else if (lineup === 'allhumans') {
+        input.disabled = false;
+        input.value = input.value.replace(' (AI)', '');
+      } else {
+        input.disabled = true;
+      }
     }
   };
-  lineup.addEventListener('change', refreshSeats);
-  refreshSeats();
 
+  countSel.addEventListener('change', refreshVisibleSeats);
+  lineupSel.addEventListener('change', refreshVisibleSeats);
+  refreshVisibleSeats();
+
+  // Tab switching
+  const tabLocal = document.getElementById('tab-btn-local')!;
+  const tabOnline = document.getElementById('tab-btn-online')!;
+  const panelLocal = document.getElementById('setup-panel-local')!;
+  const panelOnline = document.getElementById('setup-panel-online')!;
+
+  tabLocal.addEventListener('click', () => {
+    tabLocal.classList.add('active');
+    tabOnline.classList.remove('active');
+    panelLocal.classList.remove('hidden');
+    panelOnline.classList.add('hidden');
+  });
+
+  tabOnline.addEventListener('click', () => {
+    tabOnline.classList.add('active');
+    tabLocal.classList.remove('active');
+    panelOnline.classList.remove('hidden');
+    panelLocal.classList.add('hidden');
+  });
+
+  // Local start
   document.getElementById('su-start')!.addEventListener('click', () => {
-    const names = [1, 2, 3, 4].map(n => (document.getElementById(`su-name-${n}`) as HTMLInputElement).value.trim());
-    const tokens = [1, 2, 3, 4].map(n => (document.getElementById(`su-token-${n}`) as HTMLSelectElement).value);
+    const total = Number(countSel.value);
+    const names = Array.from({ length: total }, (_, i) =>
+      (document.getElementById(`su-name-${i + 1}`) as HTMLInputElement).value.trim() || `Player ${i + 1}`
+    );
+    const tokens = Array.from({ length: total }, (_, i) =>
+      (document.getElementById(`su-token-${i + 1}`) as HTMLSelectElement).value
+    );
     onStart({
-      lineup: lineup.value,
+      lineup: lineupSel.value,
+      playerCount: total,
       maxRounds: Number((document.getElementById('su-length') as HTMLSelectElement).value),
       names,
       tokens,
+    });
+  });
+
+  // Online Create Room
+  document.getElementById('btn-create-room')!.addEventListener('click', () => {
+    const hostName = (document.getElementById('online-host-name') as HTMLInputElement).value.trim() || 'Host';
+    onStart({
+      lineup: 'onlineHost',
+      playerCount: 4,
+      maxRounds: 25,
+      names: [hostName],
+      tokens: ['tuktuk'],
+      onlineAction: 'create',
+    });
+  });
+
+  // Online Join Room
+  document.getElementById('btn-join-room')!.addEventListener('click', () => {
+    const code = (document.getElementById('online-room-code') as HTMLInputElement).value.trim();
+    const name = (document.getElementById('online-join-name') as HTMLInputElement).value.trim() || 'Player';
+    if (!code) {
+      alert('Please enter a room code');
+      return;
+    }
+    onStart({
+      lineup: 'onlineClient',
+      playerCount: 4,
+      maxRounds: 25,
+      names: [name],
+      tokens: ['dancer'],
+      onlineAction: 'join',
+      onlineRoomCode: code,
     });
   });
 }

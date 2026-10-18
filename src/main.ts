@@ -5,7 +5,7 @@
 
 import './ui/styles.css';
 import type { GameState, LogEntry, PlayerSetup, TokenKey } from './engine/types';
-import { PERSONAS, TOKENS } from './engine/config';
+import { PERSONAS, SEAT_COLORS, TOKENS } from './engine/config';
 import {
   applyTrade, auctionBid, auctionPass, buyCurrent, buyShield, createGame,
   declineCurrent, doBuild, endTurn, expressTransit, maintainSquare, mortgageSquare,
@@ -18,6 +18,7 @@ import { renderDice } from './ui/dice';
 import { TOKEN_AVATARS } from './ui/tokens';
 import { ensureAudio, floatCash, isMuted, popup, sfx, toast, toggleMute, tokenSfx } from './ui/fx';
 import { setLang, t } from './ui/i18n';
+import { createOnlineRoom, joinOnlineRoom, broadcastMessage, sendToHost, isOnlineHost, isOnlineClient } from './network/p2p';
 
 let S: GameState | null = null;
 let busy = false;
@@ -268,39 +269,25 @@ refreshHeader();
 // ─── Game start ───────────────────────────────────────────────────────────
 
 function lineupPlayers(cfg: StartConfig): PlayerSetup[] {
-  const make = (name: string, kind: 'human' | 'bot', persona: keyof typeof PERSONAS, tokenKey: string): PlayerSetup => ({
-    name, kind, persona, tokenKey: (tokenKey in TOKENS ? tokenKey : 'tuktuk') as TokenKey,
+  const personas: (keyof typeof PERSONAS)[] = ['aggressive', 'conservative', 'risk', 'opportunist', 'aggressive', 'conservative'];
+  const count = cfg.playerCount || cfg.names.length || 4;
+
+  return Array.from({ length: count }, (_, i) => {
+    const isHuman =
+      cfg.lineup === 'allhumans' ? true :
+      cfg.lineup === 'allbots' ? false :
+      i === 0; // 1human mode
+
+    const name = cfg.names[i] || `Player ${i + 1}`;
+    const tokenKey = (cfg.tokens[i] in TOKENS ? cfg.tokens[i] : Object.keys(TOKENS)[i % Object.keys(TOKENS).length]) as TokenKey;
+
+    return {
+      name,
+      kind: isHuman ? 'human' : 'bot',
+      persona: personas[i % personas.length],
+      tokenKey,
+    };
   });
-  switch (cfg.lineup) {
-    case '1h3b':
-      return [
-        make(cfg.names[0] || 'You (Colombo)', 'human', 'aggressive', cfg.tokens[0]),
-        make(cfg.names[1] || 'Nimali', 'bot', 'conservative', cfg.tokens[1]),
-        make(cfg.names[2] || 'Roshan', 'bot', 'risk', cfg.tokens[2]),
-        make(cfg.names[3] || 'Dilani', 'bot', 'opportunist', cfg.tokens[3]),
-      ];
-    case '2h2b':
-      return [
-        make(cfg.names[0] || 'Player 1', 'human', 'aggressive', cfg.tokens[0]),
-        make(cfg.names[1] || 'Player 2', 'human', 'conservative', cfg.tokens[1]),
-        make(cfg.names[2] || 'Roshan', 'bot', 'risk', cfg.tokens[2]),
-        make(cfg.names[3] || 'Dilani', 'bot', 'opportunist', cfg.tokens[3]),
-      ];
-    case '4h0b':
-      return [
-        make(cfg.names[0] || 'Player 1 (Colombo)', 'human', 'aggressive', cfg.tokens[0]),
-        make(cfg.names[1] || 'Player 2 (Kandy)', 'human', 'conservative', cfg.tokens[1]),
-        make(cfg.names[2] || 'Player 3 (Galle)', 'human', 'risk', cfg.tokens[2]),
-        make(cfg.names[3] || 'Player 4 (Jaffna)', 'human', 'opportunist', cfg.tokens[3]),
-      ];
-    default: // 0h4b spectator
-      return [
-        make(cfg.names[0] || 'Kasun', 'bot', 'aggressive', cfg.tokens[0]),
-        make(cfg.names[1] || 'Nimali', 'bot', 'conservative', cfg.tokens[1]),
-        make(cfg.names[2] || 'Roshan', 'bot', 'risk', cfg.tokens[2]),
-        make(cfg.names[3] || 'Dilani', 'bot', 'opportunist', cfg.tokens[3]),
-      ];
-  }
 }
 
 function start(): void {
@@ -313,9 +300,79 @@ function start(): void {
       seed: (Date.now() % 2147483647) | 0,
       maxRounds: cfg.maxRounds,
     });
+    if (cfg.onlineAction === 'create') {
+      const hostName = cfg.names[0] || 'Host';
+      void createOnlineRoom(
+        hostName,
+        (conn, data) => {
+          if (!S) return;
+          sfx('cash');
+          toast(`👋 ${data.name} joined your room!`, 'emerald');
+          const newPlayerId = S.players.length;
+          S.players.push({
+            id: newPlayerId,
+            name: data.name,
+            kind: 'human',
+            persona: 'aggressive',
+            tokenKey: (data.tokenKey in TOKENS ? data.tokenKey : 'tuktuk') as TokenKey,
+            color: SEAT_COLORS[newPlayerId % SEAT_COLORS.length],
+            cash: 30000,
+            position: 0,
+            inJail: false,
+            jailTurns: 0,
+            bankrupt: false,
+            loan: 0,
+            loanRoundsLeft: 0,
+          });
+          conn.send({ type: 'welcome', playerId: newPlayerId, state: S });
+          broadcastMessage({ type: 'state', state: S });
+          render(S, handlers);
+        },
+        (msg) => {
+          if (msg.type === 'action' && S) {
+            // Client triggered an engine action
+            const actionFn = (handlers as any)[msg.fnName];
+            if (typeof actionFn === 'function') actionFn(...msg.args);
+          } else if (msg.type === 'emote' && S) {
+            sfx('emote');
+            popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+          }
+        }
+      ).then((roomId) => {
+        popup(`Room Created! Code: ${roomId}`, 'share with friends', 'emerald');
+        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+        prompt('Copy and share this Room URL with your friends to join directly:', shareUrl);
+      });
+    } else if (cfg.onlineAction === 'join' && cfg.onlineRoomCode) {
+      toast(`Connecting to room ${cfg.onlineRoomCode}...`, 'amber');
+      void joinOnlineRoom(
+        cfg.onlineRoomCode,
+        cfg.names[0] || 'Player',
+        cfg.tokens[0] || 'dancer',
+        (msg) => {
+          if (msg.type === 'welcome') {
+            sfx('fanfare');
+            toast(`Connected to ${cfg.onlineRoomCode}!`, 'emerald');
+            S = msg.state;
+            render(S, handlers);
+          } else if (msg.type === 'state') {
+            S = msg.state;
+            render(S, handlers);
+          } else if (msg.type === 'emote') {
+            sfx('emote');
+            popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+          }
+        }
+      );
+    }
+
     render(S, handlers);
     scheduleBot();
   });
 }
+
+document.getElementById('btn-rooms')?.addEventListener('click', () => {
+  start();
+});
 
 start();

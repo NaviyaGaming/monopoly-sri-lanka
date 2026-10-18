@@ -187,6 +187,8 @@ export const TOKENS: Record<TokenKey, TokenDef> = {
   dancer:   { key: 'dancer',   icon: '💃', name: 'Kandyan Dancer' },
   elephant: { key: 'elephant', icon: '🐘', name: 'Ceylon Elephant' },
   train:    { key: 'train',    icon: '🚂', name: 'Yal Devi Express' },
+  gem:      { key: 'gem',      icon: '💎', name: 'Ceylon Blue Sapphire' },
+  ship:     { key: 'ship',     icon: '⛵', name: 'Trinco Ocean Clipper' },
 };
 
-export const SEAT_COLORS = ['#10b981', '#0ea5e9', '#f43f5e', '#a855f7'];
+export const SEAT_COLORS = ['#10b981', '#0ea5e9', '#f43f5e', '#a855f7', '#f59e0b', '#06b6d4'];
