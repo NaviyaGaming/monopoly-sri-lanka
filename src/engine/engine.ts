@@ -23,7 +23,8 @@ export function cur(s: GameState) {
 
 // ─── Game creation ────────────────────────────────────────────────────────
 
-export function createGame(opts: { players: PlayerSetup[]; seed: number; maxRounds: number }): GameState {
+export function createGame(opts: { players: PlayerSetup[]; seed: number; maxRounds: number; startingCash?: number }): GameState {
+  const startCash = opts.startingCash ?? START_CASH;
   const players = opts.players.map((p, i) => ({
     id: i,
     name: p.name,
@@ -31,7 +32,7 @@ export function createGame(opts: { players: PlayerSetup[]; seed: number; maxRoun
     persona: p.persona,
     tokenKey: p.tokenKey,
     color: SEAT_COLORS[i % SEAT_COLORS.length],
-    cash: START_CASH,
+    cash: startCash,
     position: 0,
     inJail: false,
     jailTurns: 0,

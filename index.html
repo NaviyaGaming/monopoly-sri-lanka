@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>POLA: Monopoly Sri Lanka — Property, Banking & Insurance Board Game</title>
+  <title>POLA: Monopoly Sri Lanka — Free Online Multiplayer Board Game</title>
   <meta name="theme-color" content="#064e3b" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛺</text></svg>" />
 </head>
 <body class="min-h-screen">
+  <!-- ─── TOPBAR ───────────────────────────────────────────── -->
   <header id="topbar">
-    <div class="brand">
+    <div class="brand" id="brand-link" title="Click to go to Home">
       <div class="logo-badge">🛺</div>
       <div>
         <div class="brand-row">
@@ -20,7 +21,8 @@
       </div>
     </div>
 
-    <div class="hdr-pills">
+    <!-- In-Game Stats Header (Visible during active match) -->
+    <div class="hdr-pills" id="game-hdr-pills" style="display: none;">
       <div class="pill"><span class="dim" id="lbl-round">Round</span> <b id="hdr-round">1 / 25</b></div>
       <div class="pill amber" title="Macro-Economic Cycle shifts every 5 rounds">
         <span id="hdr-cycle-icon">☀️</span>
@@ -30,7 +32,8 @@
       <div class="pill teal"><span>🪷</span> <span class="dim">Poya Pool:</span> <b id="hdr-poya-pool">LKR 1,000</b></div>
     </div>
 
-      <button class="btn gold small btn-rooms-trigger" id="btn-rooms">👥 Online Rooms</button>
+    <div class="topbar-actions">
+      <button class="btn tiny danger" id="btn-leave-game" style="display: none;">🏠 Exit to Home</button>
       <div class="lang-toggle" role="group" aria-label="Language">
         <button id="btn-lang-en" data-lang="en" class="active">EN</button>
         <button id="btn-lang-si" data-lang="si">සිං</button>
@@ -40,12 +43,199 @@
     </div>
   </header>
 
-  <main id="layout">
+  <!-- ─── VIEW 1: HOME PAGE (Richup.io Style) ────────────────── -->
+  <div id="view-home" class="page-view">
+    <div class="home-hero">
+      <div class="home-badge">🇱🇰 FREE ONLINE MULTIPLAYER BOARD GAME</div>
+      <h1 class="home-title">POLA · MONOPOLY LK</h1>
+      <p class="home-subtitle">The rich, strategic Sri Lankan property trading empire. Play with friends online or solo vs AI bots!</p>
+
+      <div class="home-cards-grid">
+        <!-- Card 1: Create Online Room -->
+        <div class="home-card card-create">
+          <div class="card-icon-badge">✨</div>
+          <h2>Play Online with Friends</h2>
+          <p class="card-desc">Create a private room, copy your invite link, and play with up to 6 friends anywhere on any device.</p>
+          
+          <div class="field">
+            <label for="home-host-name">Your Nickname</label>
+            <input id="home-host-name" value="Navindu" maxlength="18" placeholder="Enter nickname" />
+          </div>
+
+          <div class="field">
+            <label>Choose Your Token</label>
+            <div class="token-selector-row" id="home-token-selector">
+              <button type="button" class="token-pill active" data-token="tuktuk" title="Colombo Tuk-Tuk">🛺 Tuk-Tuk</button>
+              <button type="button" class="token-pill" data-token="dancer" title="Kandyan Dancer">💃 Dancer</button>
+              <button type="button" class="token-pill" data-token="elephant" title="Ceylon Tusker">🐘 Elephant</button>
+              <button type="button" class="token-pill" data-token="train" title="Viceroy Train">🚂 Train</button>
+              <button type="button" class="token-pill" data-token="gem" title="Ceylon Sapphire">💎 Sapphire</button>
+              <button type="button" class="token-pill" data-token="ship" title="Ocean Clipper">⛵ Clipper</button>
+            </div>
+          </div>
+
+          <button class="btn primary btn-hero-action" id="home-btn-create-room">
+            🎮 Create Private Room
+          </button>
+        </div>
+
+        <!-- Card 2: Join Existing Room -->
+        <div class="home-card card-join">
+          <div class="card-icon-badge">🔗</div>
+          <h2>Join a Friend's Game</h2>
+          <p class="card-desc">Got an invite code or link from a friend? Paste it below to jump directly into their waiting lobby.</p>
+
+          <div class="field">
+            <label for="home-room-code">Room Code or Invite Link</label>
+            <input id="home-room-code" placeholder="e.g. pola-x8a2 or paste full URL" />
+          </div>
+
+          <div class="field">
+            <label for="home-join-name">Your Nickname</label>
+            <input id="home-join-name" value="Player" maxlength="18" placeholder="Enter nickname" />
+          </div>
+
+          <button class="btn indigo btn-hero-action" id="home-btn-join-room">
+            🚀 Join Room
+          </button>
+        </div>
+
+        <!-- Card 3: Solo / Local vs AI -->
+        <div class="home-card card-solo">
+          <div class="card-icon-badge">🤖</div>
+          <h2>Solo / Play vs AI Bots</h2>
+          <p class="card-desc">Sharpen your strategy against 5 unique AI tycoon personalities or play pass-and-play locally.</p>
+
+          <div class="home-form-row">
+            <div class="field">
+              <label for="home-solo-players">Players</label>
+              <select id="home-solo-players">
+                <option value="2">2 Players</option>
+                <option value="3">3 Players</option>
+                <option value="4" selected>4 Players (Classic)</option>
+                <option value="5">5 Players</option>
+                <option value="6">6 Players (Full Island)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="home-solo-rounds">Match Length</label>
+              <select id="home-solo-rounds">
+                <option value="15">15 Rounds (Quick)</option>
+                <option value="25" selected>25 Rounds (Classic)</option>
+                <option value="50">50 Rounds (Marathon)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="home-solo-cash">Starting Cash</label>
+            <select id="home-solo-cash">
+              <option value="15000">LKR 15,000 (Challenging)</option>
+              <option value="30000" selected>LKR 30,000 (Standard)</option>
+              <option value="50000">LKR 50,000 (Tycoon)</option>
+            </select>
+          </div>
+
+          <button class="btn gold btn-hero-action" id="home-btn-start-solo">
+            🎲 Start Match vs AI
+          </button>
+        </div>
+      </div>
+
+      <!-- Feature Badges Row -->
+      <div class="home-features">
+        <div class="feat-badge"><span>🏛️</span> 40 Iconic Sri Lankan Districts</div>
+        <div class="feat-badge"><span>🏦</span> Bank of Serendib & Credit Loans</div>
+        <div class="feat-badge"><span>🛡️</span> Disaster Shields & Insurances</div>
+        <div class="feat-badge"><span>⛅</span> Macro Economic Weather Cycles</div>
+        <div class="feat-badge"><span>🎲</span> Ultra-Smooth 3D Tumbling Dice</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 2: MULTIPLAYER ROOM LOBBY PAGE ───────────────── -->
+  <div id="view-lobby" class="page-view hidden">
+    <div class="lobby-wrap">
+      <!-- Lobby Header / Room Link -->
+      <div class="lobby-header-card">
+        <div class="lobby-code-box">
+          <span class="dim">ROOM CODE:</span>
+          <span class="lobby-code-tag" id="lobby-code-display">POLA-XXXX</span>
+        </div>
+        <div class="lobby-share-actions">
+          <input class="lobby-link-input" id="lobby-link-copy-val" readonly value="" />
+          <button class="btn emerald" id="lobby-btn-copy-link">📋 Copy Invite Link</button>
+        </div>
+        <p class="lobby-hint">Send this link on WhatsApp, Messenger, or Discord so friends can join from their phone or PC!</p>
+      </div>
+
+      <div class="lobby-main-grid">
+        <!-- Left: Connected Players Podium (Up to 6 seats) -->
+        <div class="lobby-podium-card">
+          <div class="podium-head">
+            <h3>👥 Players in Lobby (<span id="lobby-players-count">1</span>/6)</h3>
+            <span class="pill teal" id="lobby-status-pill">Waiting for players...</span>
+          </div>
+          <div class="lobby-slots-grid" id="lobby-slots-container">
+            <!-- Dynamically populated slots -->
+          </div>
+
+          <div class="lobby-host-controls" id="lobby-host-controls">
+            <h4>⚙️ Room Settings</h4>
+            <div class="lobby-settings-row">
+              <div class="field">
+                <label for="lobby-set-cash">Starting Cash</label>
+                <select id="lobby-set-cash">
+                  <option value="15000">LKR 15,000</option>
+                  <option value="30000" selected>LKR 30,000</option>
+                  <option value="50000">LKR 50,000</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="lobby-set-rounds">Rounds</label>
+                <select id="lobby-set-rounds">
+                  <option value="15">15 Rounds (Quick)</option>
+                  <option value="25" selected>25 Rounds (Classic)</option>
+                  <option value="40">40 Rounds (Extended)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="lobby-action-buttons">
+              <button class="btn gold" id="lobby-btn-add-bot">🤖 Add AI Bot to Fill Seat</button>
+              <button class="btn primary btn-large" id="lobby-btn-start-game">🚀 START GAME</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: In-Lobby Chat -->
+        <div class="lobby-chat-card">
+          <h3>💬 Lobby Chat</h3>
+          <div class="lobby-chat-messages" id="lobby-chat-messages">
+            <div class="chat-msg system">
+              <span class="msg-author">🏛️ Room Central:</span> Welcome to the lobby! Chat while waiting for players.
+            </div>
+          </div>
+          <form id="lobby-chat-form" class="chat-input-row">
+            <input id="lobby-chat-input" placeholder="Type a message..." maxlength="120" autocomplete="off" />
+            <button type="submit" class="btn-chat-send">➤</button>
+          </form>
+          <div class="lobby-bottom-leave">
+            <button class="btn tiny danger" id="lobby-btn-leave">🚪 Leave Room to Home</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── VIEW 3: GAME BOARD VIEW ───────────────────────────── -->
+  <main id="layout" class="page-view hidden">
     <!-- Richup.io Style Left Live Chat & Activity Stream -->
     <aside id="chat-panel">
       <div class="chat-header">
         <span class="chat-title">💬 Island Gazette & Chat</span>
-        <button class="btn tiny" id="btn-copy-room-link" title="Share invite link">🔗 Share Link</button>
+        <button class="btn tiny" id="btn-copy-room-link" title="Share invite link">🔗 Share</button>
       </div>
       <div id="live-chat-messages">
         <div class="chat-msg system">

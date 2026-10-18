@@ -13,13 +13,29 @@ export interface RoomMeta {
   maxPlayers: number;
 }
 
+export interface LobbyPlayer {
+  id: number;
+  name: string;
+  tokenKey: string;
+  isHost: boolean;
+  isBot?: boolean;
+}
+
+export interface LobbySettings {
+  startingCash: number;
+  maxRounds: number;
+}
+
 export type NetMessage =
   | { type: 'join'; name: string; tokenKey: string }
   | { type: 'welcome'; playerId: number; state: GameState }
   | { type: 'state'; state: GameState }
   | { type: 'action'; fnName: string; args: any[] }
   | { type: 'chat'; sender: string; text: string; time: string }
-  | { type: 'emote'; sender: string; emoji: string };
+  | { type: 'emote'; sender: string; emoji: string }
+  | { type: 'lobby_update'; players: LobbyPlayer[]; settings: LobbySettings }
+  | { type: 'lobby_chat'; sender: string; text: string; time: string }
+  | { type: 'start_game'; state: GameState };
 
 let peer: Peer | null = null;
 let connections: DataConnection[] = [];
@@ -46,6 +62,7 @@ export async function createOnlineRoom(
   hostName: string,
   onPlayerJoin: (conn: DataConnection, data: { name: string; tokenKey: string }) => void,
   onMessage: (msg: NetMessage, fromConn: DataConnection) => void,
+  onPlayerLeave?: (conn: DataConnection) => void,
 ): Promise<string> {
   // Clean up any existing connection
   disconnectOnline();
@@ -82,6 +99,7 @@ export async function createOnlineRoom(
 
       conn.on('close', () => {
         connections = connections.filter(c => c !== conn);
+        onPlayerLeave?.(conn);
       });
     });
   });
@@ -95,6 +113,7 @@ export async function joinOnlineRoom(
   playerName: string,
   tokenKey: string,
   onMessage: (msg: NetMessage) => void,
+  onDisconnect?: () => void,
 ): Promise<void> {
   disconnectOnline();
   currentRoomId = roomId;
@@ -114,6 +133,11 @@ export async function joinOnlineRoom(
 
       conn.on('data', (raw: any) => {
         onMessage(raw as NetMessage);
+      });
+
+      conn.on('close', () => {
+        hostConnection = null;
+        onDisconnect?.();
       });
 
       conn.on('error', (err) => {
@@ -149,15 +173,15 @@ export function sendToHost(msg: NetMessage): void {
 
 export function disconnectOnline(): void {
   if (hostConnection) {
-    hostConnection.close();
+    try { hostConnection.close(); } catch {}
     hostConnection = null;
   }
   for (const conn of connections) {
-    conn.close();
+    try { conn.close(); } catch {}
   }
   connections = [];
   if (peer) {
-    peer.destroy();
+    try { peer.destroy(); } catch {}
     peer = null;
   }
   isHost = false;

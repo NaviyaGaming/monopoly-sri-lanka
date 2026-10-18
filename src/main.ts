@@ -1,7 +1,4 @@
-// ─── Serendib Tycoon driver: setup, animation pipeline, bot pacing ───────
-// The engine resolves instantly and deterministically; the driver then plays
-// the cosmetic sequence — dice tumble, 3D token hop with character sound,
-// popups, floaters — before re-rendering. One rules path for everyone.
+// ─── POLA Sri Lanka Driver: Multi-View Router, Richup Lobby, P2P & Board ───
 
 import './ui/styles.css';
 import type { GameState, LogEntry, PlayerSetup, TokenKey } from './engine/types';
@@ -13,17 +10,50 @@ import {
   unmortgageSquare, validTrade,
 } from './engine/engine';
 import { botAct, botConsiderTrade, botToAct } from './engine/bots';
-import { render, setActiveTab, showSetup, markLanded, setDiceClickHandler, type Handlers, type StartConfig } from './ui/render';
+import { render, setActiveTab, markLanded, setDiceClickHandler, type Handlers } from './ui/render';
 import { renderDice } from './ui/dice';
 import { TOKEN_AVATARS } from './ui/tokens';
 import { ensureAudio, floatCash, isMuted, popup, sfx, toast, toggleMute, tokenSfx } from './ui/fx';
 import { setLang, t } from './ui/i18n';
-import { createOnlineRoom, joinOnlineRoom, broadcastMessage, sendToHost, isOnlineHost, isOnlineClient } from './network/p2p';
+import {
+  createOnlineRoom, joinOnlineRoom, broadcastMessage, sendToHost,
+  isOnlineHost, isOnlineClient, disconnectOnline,
+  type LobbyPlayer, type LobbySettings,
+} from './network/p2p';
 
 let S: GameState | null = null;
 let busy = false;
 let fastMode = localStorage.getItem('st-fast') === '1';
 const BOT_STEP_MS = 650;
+
+// ─── View Routing (Home | Lobby | Game) ────────────────────────────────────
+
+type ViewType = 'home' | 'lobby' | 'game';
+
+function showView(view: ViewType): void {
+  const vHome = document.getElementById('view-home');
+  const vLobby = document.getElementById('view-lobby');
+  const vGame = document.getElementById('layout');
+  const gameHdr = document.getElementById('game-hdr-pills');
+  const leaveBtn = document.getElementById('btn-leave-game');
+
+  if (vHome) vHome.classList.toggle('hidden', view !== 'home');
+  if (vLobby) vLobby.classList.toggle('hidden', view !== 'lobby');
+  if (vGame) vGame.classList.toggle('hidden', view !== 'game');
+
+  if (gameHdr) gameHdr.style.display = view === 'game' ? 'flex' : 'none';
+  if (leaveBtn) leaveBtn.style.display = view === 'game' ? 'inline-flex' : 'none';
+
+  if (view === 'home') {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('room')) {
+      url.searchParams.delete('room');
+      window.history.replaceState({}, '', url.pathname);
+    }
+  }
+}
+
+// ─── Snapshot & Execution Pipeline ────────────────────────────────────────
 
 interface Snapshot {
   actor: number;
@@ -75,6 +105,10 @@ async function perform(fn: (s: GameState) => void): Promise<void> {
     });
 
     render(s, handlers);
+
+    if (isOnlineHost()) {
+      broadcastMessage({ type: 'state', state: s });
+    }
 
     if (s.phase === 'gameOver' && s.winner !== null) sfx('win');
     // Human card popup pauses bot pacing until OK is clicked.
@@ -148,7 +182,7 @@ function playOutcome(entries: LogEntry[]): void {
   if (entries.some(e => e.kind === 'event')) { sfx('buy'); return; }
 }
 
-// ─── Bot scheduling (pauses while a human card popup is open) ─────────────
+// ─── Bot scheduling ───────────────────────────────────────────────────────
 
 function scheduleBot(): void {
   if (!S || busy || S.phase === 'gameOver') return;
@@ -160,26 +194,36 @@ function scheduleBot(): void {
   }, fastMode ? 220 : BOT_STEP_MS);
 }
 
+// ─── Client Action Delegation (WebRTC sync) ───────────────────────────────
+
+function actionOrSend(fnName: string, localFn: () => void, ...args: any[]): void {
+  if (isOnlineClient()) {
+    sendToHost({ type: 'action', fnName, args });
+  } else {
+    localFn();
+  }
+}
+
 // ─── Handlers ─────────────────────────────────────────────────────────────
 
 const handlers: Handlers = {
-  onRoll: () => void perform(s => takeTurnRoll(s)),
-  onBail: () => void perform(s => payBail(s)),
-  onBuy: () => void perform(s => { buyCurrent(s); }),
-  onPass: () => void perform(s => declineCurrent(s)),
-  onBid: (inc: number) => void perform(s => { auctionBid(s, inc); }),
-  onWithdraw: () => void perform(s => auctionPass(s)),
-  onEndTurn: () => void perform(s => { s.cardJustDrawn = null; endTurn(s); }),
-  onBuild: (idx: number) => void perform(s => { doBuild(s, idx); }),
-  onSellBuilding: (idx: number) => void perform(s => { sellBuilding(s, idx); }),
-  onMortgage: (idx: number) => void perform(s => { mortgageSquare(s, idx); }),
-  onUnmortgage: (idx: number) => void perform(s => { unmortgageSquare(s, idx); }),
-  onMaintain: (idx: number) => void perform(s => { maintainSquare(s, idx); }),
-  onShield: (idx: number, tier: 1 | 2 | 3) => void perform(s => { buyShield(s, idx, tier); }),
-  onRepair: (idx: number) => void perform(s => { repairSquare(s, idx); }),
-  onLoan: (amount: number) => void perform(s => { takeLoan(s, amount); }),
-  onRepay: (amount: number) => void perform(s => { repayLoan(s, amount); }),
-  onTransit: (kind: 'unowned' | 'bank') => void perform(s => expressTransit(s, kind)),
+  onRoll: () => actionOrSend('onRoll', () => void perform(s => takeTurnRoll(s))),
+  onBail: () => actionOrSend('onBail', () => void perform(s => payBail(s))),
+  onBuy: () => actionOrSend('onBuy', () => void perform(s => { buyCurrent(s); })),
+  onPass: () => actionOrSend('onPass', () => void perform(s => declineCurrent(s))),
+  onBid: (inc: number) => actionOrSend('onBid', () => void perform(s => { auctionBid(s, inc); }), inc),
+  onWithdraw: () => actionOrSend('onWithdraw', () => void perform(s => auctionPass(s))),
+  onEndTurn: () => actionOrSend('onEndTurn', () => void perform(s => { s.cardJustDrawn = null; endTurn(s); })),
+  onBuild: (idx: number) => actionOrSend('onBuild', () => void perform(s => { doBuild(s, idx); }), idx),
+  onSellBuilding: (idx: number) => actionOrSend('onSellBuilding', () => void perform(s => { sellBuilding(s, idx); }), idx),
+  onMortgage: (idx: number) => actionOrSend('onMortgage', () => void perform(s => { mortgageSquare(s, idx); }), idx),
+  onUnmortgage: (idx: number) => actionOrSend('onUnmortgage', () => void perform(s => { unmortgageSquare(s, idx); }), idx),
+  onMaintain: (idx: number) => actionOrSend('onMaintain', () => void perform(s => { maintainSquare(s, idx); }), idx),
+  onShield: (idx: number, tier: 1 | 2 | 3) => actionOrSend('onShield', () => void perform(s => { buyShield(s, idx, tier); }), idx, tier),
+  onRepair: (idx: number) => actionOrSend('onRepair', () => void perform(s => { repairSquare(s, idx); }), idx),
+  onLoan: (amount: number) => actionOrSend('onLoan', () => void perform(s => { takeLoan(s, amount); }), amount),
+  onRepay: (amount: number) => actionOrSend('onRepay', () => void perform(s => { repayLoan(s, amount); }), amount),
+  onTransit: (kind: 'unowned' | 'bank') => actionOrSend('onTransit', () => void perform(s => expressTransit(s, kind)), kind),
   onTradeSubmit: (partner, giveSq, giveCash, wantSq, wantCash) => {
     if (!S) return;
     const offer = { fromId: S.current, toId: partner, giveSquare: giveSq, giveCash, wantSquare: wantSq, wantCash };
@@ -198,20 +242,25 @@ const handlers: Handlers = {
         if (/TRADE:/.test(result)) toast('🤝 Trade accepted!', 'emerald');
         else toast('🤝 Trade declined — offer more value.', 'rose');
       }
-      // Human partners see the accept/decline modal via pendingTrade state.
     });
   },
-  onTradeAccept: () => void perform(s => {
+  onTradeAccept: () => actionOrSend('onTradeAccept', () => void perform(s => {
     if (!s.pendingTrade) return;
     applyTrade(s, s.pendingTrade);
     s.pendingTrade = null;
-  }),
-  onTradeDecline: () => void perform(s => { s.pendingTrade = null; }),
-  onCardOk: () => void perform(s => {
+  })),
+  onTradeDecline: () => actionOrSend('onTradeDecline', () => void perform(s => { s.pendingTrade = null; })),
+  onCardOk: () => actionOrSend('onCardOk', () => void perform(s => {
     sfx('cardflip');
     s.cardJustDrawn = null;
-  }),
-  onRestart: () => start(),
+  })),
+  onRestart: () => {
+    if (confirm('Start a new game?')) {
+      disconnectOnline();
+      S = null;
+      showView('home');
+    }
+  },
   onSelectSquare: () => {},
   onTab: () => {},
   onEmote: (emoji: string) => {
@@ -219,13 +268,14 @@ const handlers: Handlers = {
     sfx('emote');
     const p = S.players[S.current];
     popup(`${p.name}: ${emoji}`, 'reaction', 'amber');
-    toast(`${p.name} reacted with ${emoji}`, 'emerald');
+    if (isOnlineHost()) broadcastMessage({ type: 'emote', sender: p.name, emoji });
+    else if (isOnlineClient()) sendToHost({ type: 'emote', sender: p.name, emoji });
   },
 };
 
 setDiceClickHandler(() => {
   if (S && S.phase === 'preRoll' && S.players[S.current].kind === 'human' && !busy) {
-    void perform(s => takeTurnRoll(s));
+    handlers.onRoll();
   }
 });
 
@@ -265,16 +315,14 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('.tab-trigger')) 
   });
 }
 
-// ─── Live Chat & Activity Stream (Richup Style) ───────────────────────────
+// ─── Live In-Game Chat ────────────────────────────────────────────────────
 
 function appendChatMessage(sender: string, text: string, isSelf = false, isSystem = false): void {
   const container = document.getElementById('live-chat-messages');
   if (!container) return;
   const msgDiv = document.createElement('div');
   msgDiv.className = `chat-msg ${isSystem ? 'system' : isSelf ? 'self' : 'other'}`;
-  msgDiv.innerHTML = isSystem
-    ? `<span class="msg-author">${sender}:</span> ${text}`
-    : `<span class="msg-author">${sender}:</span> ${text}`;
+  msgDiv.innerHTML = `<span class="msg-author">${sender}:</span> ${text}`;
   container.appendChild(msgDiv);
   container.scrollTop = container.scrollHeight;
 }
@@ -310,121 +358,480 @@ document.getElementById('btn-copy-room-link')?.addEventListener('click', () => {
   });
 });
 
-refreshHeader();
+// ─── Lobby State & UI Logic ───────────────────────────────────────────────
 
-// ─── Game start ───────────────────────────────────────────────────────────
+let currentLobbyPlayers: LobbyPlayer[] = [];
+let currentLobbySettings: LobbySettings = {
+  startingCash: 30000,
+  maxRounds: 25,
+};
+let myPlayerName = 'Navindu';
+let myTokenKey: TokenKey = 'tuktuk';
 
-function lineupPlayers(cfg: StartConfig): PlayerSetup[] {
-  const personas: (keyof typeof PERSONAS)[] = ['aggressive', 'conservative', 'risk', 'opportunist', 'aggressive', 'conservative'];
-  const count = cfg.playerCount || cfg.names.length || 4;
+function appendLobbyChat(sender: string, text: string, isSystem = false): void {
+  const container = document.getElementById('lobby-chat-messages');
+  if (!container) return;
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `chat-msg ${isSystem ? 'system' : ''}`;
+  msgDiv.innerHTML = `<span class="msg-author">${sender}:</span> ${text}`;
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
+}
 
-  return Array.from({ length: count }, (_, i) => {
-    const isHuman =
-      cfg.lineup === 'allhumans' ? true :
-      cfg.lineup === 'allbots' ? false :
-      i === 0; // 1human mode
-
-    const name = cfg.names[i] || `Player ${i + 1}`;
-    const tokenKey = (cfg.tokens[i] in TOKENS ? cfg.tokens[i] : Object.keys(TOKENS)[i % Object.keys(TOKENS).length]) as TokenKey;
-
-    return {
-      name,
-      kind: isHuman ? 'human' : 'bot',
-      persona: personas[i % personas.length],
-      tokenKey,
-    };
+function broadcastLobbyUpdate(): void {
+  if (!isOnlineHost()) return;
+  broadcastMessage({
+    type: 'lobby_update',
+    players: currentLobbyPlayers,
+    settings: currentLobbySettings,
   });
 }
 
-function start(): void {
-  S = null;
-  showSetup((cfg: StartConfig) => {
-    ensureAudio();
-    sfx('click');
-    S = createGame({
-      players: lineupPlayers(cfg),
-      seed: (Date.now() % 2147483647) | 0,
-      maxRounds: cfg.maxRounds,
-    });
-    if (cfg.onlineAction === 'create') {
-      const hostName = cfg.names[0] || 'Host';
-      void createOnlineRoom(
-        hostName,
-        (conn, data) => {
-          if (!S) return;
-          sfx('cash');
-          toast(`👋 ${data.name} joined your room!`, 'emerald');
-          const newPlayerId = S.players.length;
-          S.players.push({
-            id: newPlayerId,
-            name: data.name,
-            kind: 'human',
-            persona: 'aggressive',
-            tokenKey: (data.tokenKey in TOKENS ? data.tokenKey : 'tuktuk') as TokenKey,
-            color: SEAT_COLORS[newPlayerId % SEAT_COLORS.length],
-            cash: 30000,
-            position: 0,
-            inJail: false,
-            jailTurns: 0,
-            bankrupt: false,
-            loan: 0,
-            loanRoundsLeft: 0,
-          });
-          conn.send({ type: 'welcome', playerId: newPlayerId, state: S });
-          broadcastMessage({ type: 'state', state: S });
-          render(S, handlers);
-        },
-        (msg) => {
-          if (msg.type === 'action' && S) {
-            // Client triggered an engine action
-            const actionFn = (handlers as any)[msg.fnName];
-            if (typeof actionFn === 'function') actionFn(...msg.args);
-          } else if (msg.type === 'emote' && S) {
-            sfx('emote');
-            popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
-          } else if (msg.type === 'chat') {
-            appendChatMessage(msg.sender, msg.text, false);
-            broadcastMessage(msg); // re-broadcast to other players
-          }
-        }
-      ).then((roomId) => {
-        popup(`Room Created! Code: ${roomId}`, 'share with friends', 'emerald');
-        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-        appendChatMessage('System', `Room ${roomId} created! Share this link with your friends: ${shareUrl}`, false, true);
-      });
-    } else if (cfg.onlineAction === 'join' && cfg.onlineRoomCode) {
-      toast(`Connecting to room ${cfg.onlineRoomCode}...`, 'amber');
-      void joinOnlineRoom(
-        cfg.onlineRoomCode,
-        cfg.names[0] || 'Player',
-        cfg.tokens[0] || 'dancer',
-        (msg) => {
-          if (msg.type === 'welcome') {
-            sfx('fanfare');
-            toast(`Connected to ${cfg.onlineRoomCode}!`, 'emerald');
-            S = msg.state;
-            render(S, handlers);
-            appendChatMessage('System', `Connected to room ${cfg.onlineRoomCode}!`, false, true);
-          } else if (msg.type === 'state') {
-            S = msg.state;
-            render(S, handlers);
-          } else if (msg.type === 'emote') {
-            sfx('emote');
-            popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
-          } else if (msg.type === 'chat') {
-            appendChatMessage(msg.sender, msg.text, false);
-          }
-        }
-      );
+function updateLobbyUI(): void {
+  const countEl = document.getElementById('lobby-players-count');
+  if (countEl) countEl.textContent = String(currentLobbyPlayers.length);
+
+  const statusEl = document.getElementById('lobby-status-pill');
+  if (statusEl) {
+    if (currentLobbyPlayers.length < 2) {
+      statusEl.textContent = 'Waiting for players (min 2)...';
+      statusEl.className = 'pill amber';
+    } else {
+      statusEl.textContent = 'Ready to launch!';
+      statusEl.className = 'pill teal';
     }
+  }
 
-    render(S, handlers);
-    scheduleBot();
-  });
+  const slotsCont = document.getElementById('lobby-slots-container');
+  if (slotsCont) {
+    slotsCont.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+      const p = currentLobbyPlayers[i];
+      const slotEl = document.createElement('div');
+      slotEl.className = `lobby-slot ${p ? 'occupied' : 'empty'}`;
+
+      if (p) {
+        const avatar = TOKEN_AVATARS[p.tokenKey as TokenKey] || { icon: '🛺' };
+        slotEl.innerHTML = `
+          <div class="slot-avatar" style="border-color: ${SEAT_COLORS[i % SEAT_COLORS.length]};">
+            <span class="slot-emoji">${avatar.icon}</span>
+          </div>
+          <div class="slot-info">
+            <div class="slot-name">${p.name}</div>
+            <div class="slot-badges">
+              ${p.isHost ? '<span class="badge host">👑 HOST</span>' : ''}
+              ${p.isBot ? '<span class="badge bot">🤖 BOT</span>' : '<span class="badge ready">READY</span>'}
+            </div>
+          </div>
+          ${isOnlineHost() && p.isBot ? `<button class="btn-remove-bot" data-slot="${i}" title="Remove bot">✕</button>` : ''}
+        `;
+        if (isOnlineHost() && p.isBot) {
+          slotEl.querySelector('.btn-remove-bot')?.addEventListener('click', () => {
+            currentLobbyPlayers.splice(i, 1);
+            broadcastLobbyUpdate();
+            updateLobbyUI();
+          });
+        }
+      } else {
+        slotEl.innerHTML = `
+          <div class="slot-avatar empty">
+            <span class="slot-emoji">➕</span>
+          </div>
+          <div class="slot-info">
+            <div class="slot-name dim">Slot ${i + 1} Open</div>
+            <div class="slot-badges"><span class="badge empty">Waiting...</span></div>
+          </div>
+        `;
+      }
+      slotsCont.appendChild(slotEl);
+    }
+  }
+
+  // Host controls vs Client view
+  const hostCtrls = document.getElementById('lobby-host-controls');
+  const startBtn = document.getElementById('lobby-btn-start-game') as HTMLButtonElement;
+  const addBotBtn = document.getElementById('lobby-btn-add-bot') as HTMLButtonElement;
+  const cashSel = document.getElementById('lobby-set-cash') as HTMLSelectElement;
+  const roundsSel = document.getElementById('lobby-set-rounds') as HTMLSelectElement;
+
+  if (isOnlineHost()) {
+    if (hostCtrls) hostCtrls.style.display = 'block';
+    if (startBtn) {
+      startBtn.disabled = currentLobbyPlayers.length < 2;
+      startBtn.textContent = currentLobbyPlayers.length < 2 ? '⏳ Waiting for 2+ Players...' : '🚀 START GAME';
+    }
+    if (addBotBtn) {
+      addBotBtn.style.display = currentLobbyPlayers.length >= 6 ? 'none' : 'inline-block';
+    }
+    if (cashSel) cashSel.disabled = false;
+    if (roundsSel) roundsSel.disabled = false;
+  } else {
+    if (hostCtrls) hostCtrls.style.display = 'block';
+    if (startBtn) {
+      startBtn.disabled = true;
+      startBtn.textContent = '⏳ Waiting for Host to Start...';
+    }
+    if (addBotBtn) addBotBtn.style.display = 'none';
+    if (cashSel) cashSel.disabled = true;
+    if (roundsSel) roundsSel.disabled = true;
+  }
 }
 
-document.getElementById('btn-rooms')?.addEventListener('click', () => {
-  start();
+// ─── Multiplayer Actions ──────────────────────────────────────────────────
+
+async function handleCreateRoom(): Promise<void> {
+  const nameInput = document.getElementById('home-host-name') as HTMLInputElement;
+  const hostName = nameInput?.value.trim() || 'Navindu';
+  myPlayerName = hostName;
+
+  showView('lobby');
+  appendLobbyChat('Central', 'Initializing private multiplayer room on WebRTC network...', true);
+
+  try {
+    const roomId = await createOnlineRoom(
+      hostName,
+      // onPlayerJoin
+      (conn, data) => {
+        if (currentLobbyPlayers.length >= 6) {
+          conn.send({ type: 'lobby_chat', sender: 'System', text: 'Room is full!', time: '' });
+          conn.close();
+          return;
+        }
+        sfx('cash');
+        toast(`👋 ${data.name} joined the lobby!`, 'emerald');
+        const newPlayerId = currentLobbyPlayers.length;
+        currentLobbyPlayers.push({
+          id: newPlayerId,
+          name: data.name,
+          tokenKey: (data.tokenKey in TOKENS ? data.tokenKey : 'tuktuk'),
+          isHost: false,
+          isBot: false,
+        });
+        appendLobbyChat('System', `${data.name} joined the lobby.`, true);
+        broadcastLobbyUpdate();
+        updateLobbyUI();
+      },
+      // onMessage
+      (msg) => {
+        if (msg.type === 'action' && S) {
+          const actionFn = (handlers as any)[msg.fnName];
+          if (typeof actionFn === 'function') actionFn(...msg.args);
+        } else if (msg.type === 'lobby_chat') {
+          appendLobbyChat(msg.sender, msg.text);
+          broadcastMessage(msg);
+        } else if (msg.type === 'chat') {
+          appendChatMessage(msg.sender, msg.text, false);
+          broadcastMessage(msg);
+        } else if (msg.type === 'emote') {
+          sfx('emote');
+          popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+          broadcastMessage(msg);
+        }
+      },
+      // onPlayerLeave
+      () => {
+        appendLobbyChat('System', 'A player disconnected.', true);
+        toast('A player disconnected from lobby', 'rose');
+      }
+    );
+
+    currentLobbyPlayers = [{
+      id: 0,
+      name: hostName,
+      tokenKey: myTokenKey,
+      isHost: true,
+      isBot: false,
+    }];
+
+    const codeTag = document.getElementById('lobby-code-display');
+    if (codeTag) codeTag.textContent = roomId.toUpperCase();
+
+    const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+    const linkInput = document.getElementById('lobby-link-copy-val') as HTMLInputElement;
+    if (linkInput) linkInput.value = shareUrl;
+
+    window.history.replaceState({}, '', `?room=${roomId}`);
+
+    appendLobbyChat('Central Bank', `Room created with code ${roomId.toUpperCase()}! Share link with friends.`, true);
+    toast(`🎉 Room ${roomId.toUpperCase()} created!`, 'emerald');
+    updateLobbyUI();
+  } catch (err: any) {
+    alert(`Could not create room: ${err.message || err}`);
+    showView('home');
+  }
+}
+
+async function handleJoinRoom(): Promise<void> {
+  const codeInput = document.getElementById('home-room-code') as HTMLInputElement;
+  const nameInput = document.getElementById('home-join-name') as HTMLInputElement;
+
+  let raw = codeInput?.value.trim() || '';
+  if (!raw) {
+    toast('Please enter a room code or paste an invite link', 'amber');
+    return;
+  }
+
+  if (raw.includes('room=')) {
+    try {
+      const u = new URL(raw.startsWith('http') ? raw : `http://x/${raw}`);
+      const r = u.searchParams.get('room');
+      if (r) raw = r;
+    } catch {}
+  }
+  raw = raw.toLowerCase().trim();
+
+  const playerName = nameInput?.value.trim() || 'Player';
+  myPlayerName = playerName;
+
+  showView('lobby');
+  appendLobbyChat('Central', `Connecting to room ${raw.toUpperCase()}...`, true);
+
+  const codeTag = document.getElementById('lobby-code-display');
+  if (codeTag) codeTag.textContent = raw.toUpperCase();
+  const linkInput = document.getElementById('lobby-link-copy-val') as HTMLInputElement;
+  if (linkInput) linkInput.value = `${window.location.origin}${window.location.pathname}?room=${raw}`;
+
+  try {
+    await joinOnlineRoom(
+      raw,
+      playerName,
+      myTokenKey,
+      (msg) => {
+        if (msg.type === 'lobby_update') {
+          currentLobbyPlayers = msg.players;
+          currentLobbySettings = msg.settings;
+          updateLobbyUI();
+        } else if (msg.type === 'start_game') {
+          sfx('fanfare');
+          toast('Match started by host!', 'emerald');
+          S = msg.state;
+          showView('game');
+          render(S, handlers);
+        } else if (msg.type === 'state') {
+          S = msg.state;
+          render(S, handlers);
+        } else if (msg.type === 'lobby_chat') {
+          appendLobbyChat(msg.sender, msg.text);
+        } else if (msg.type === 'chat') {
+          appendChatMessage(msg.sender, msg.text, false);
+        } else if (msg.type === 'emote') {
+          sfx('emote');
+          popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+        }
+      },
+      () => {
+        toast('Disconnected from host', 'rose');
+        appendLobbyChat('System', 'Disconnected from host.', true);
+      }
+    );
+
+    toast(`Connected to ${raw.toUpperCase()}!`, 'emerald');
+    appendLobbyChat('System', `Connected to lobby ${raw.toUpperCase()}! Waiting for host to start...`, true);
+    updateLobbyUI();
+  } catch (err: any) {
+    alert(`Could not connect to room: ${err.message || err}`);
+    showView('home');
+  }
+}
+
+// ─── Attach Lobby Controls ────────────────────────────────────────────────
+
+document.getElementById('lobby-btn-add-bot')?.addEventListener('click', () => {
+  if (!isOnlineHost()) return;
+  if (currentLobbyPlayers.length >= 6) {
+    toast('Room is already full (6 players max)!', 'amber');
+    return;
+  }
+  const botNames = ['Sunil Tuk-Tuk', 'Anura Tea', 'Kamal Clipper', 'Nimal Gem', 'Priyani Dancer', 'Rohan Train'];
+  const tokenKeys: TokenKey[] = ['elephant', 'dancer', 'train', 'gem', 'ship', 'tuktuk'];
+
+  const usedTokens = new Set(currentLobbyPlayers.map(p => p.tokenKey));
+  const availableToken = tokenKeys.find(t => !usedTokens.has(t)) || 'elephant';
+
+  const usedNames = new Set(currentLobbyPlayers.map(p => p.name));
+  const availableName = botNames.find(n => !usedNames.has(n)) || `AI Bot ${currentLobbyPlayers.length}`;
+
+  currentLobbyPlayers.push({
+    id: currentLobbyPlayers.length,
+    name: availableName,
+    tokenKey: availableToken,
+    isHost: false,
+    isBot: true,
+  });
+
+  sfx('click');
+  broadcastLobbyUpdate();
+  updateLobbyUI();
 });
 
-start();
+document.getElementById('lobby-btn-start-game')?.addEventListener('click', () => {
+  if (!isOnlineHost()) return;
+  if (currentLobbyPlayers.length < 2) {
+    toast('Need at least 2 players to start! Add an AI Bot or invite a friend.', 'amber');
+    return;
+  }
+
+  ensureAudio();
+  sfx('fanfare');
+
+  const cashSel = document.getElementById('lobby-set-cash') as HTMLSelectElement;
+  const roundsSel = document.getElementById('lobby-set-rounds') as HTMLSelectElement;
+  const startingCash = cashSel ? parseInt(cashSel.value, 10) : 30000;
+  const maxRounds = roundsSel ? parseInt(roundsSel.value, 10) : 25;
+
+  const personas: (keyof typeof PERSONAS)[] = ['aggressive', 'conservative', 'risk', 'opportunist', 'aggressive', 'conservative'];
+
+  const players: PlayerSetup[] = currentLobbyPlayers.map((p, idx) => ({
+    name: p.name,
+    kind: p.isBot ? 'bot' : 'human',
+    persona: personas[idx % personas.length],
+    tokenKey: (p.tokenKey in TOKENS ? p.tokenKey : 'tuktuk') as TokenKey,
+  }));
+
+  S = createGame({
+    players,
+    seed: (Date.now() % 2147483647) | 0,
+    maxRounds,
+    startingCash,
+  });
+
+  broadcastMessage({ type: 'start_game', state: S });
+  showView('game');
+  render(S, handlers);
+  scheduleBot();
+  toast('🎮 Match launched! May the best tycoon win!', 'emerald');
+});
+
+const lobbyChatForm = document.getElementById('lobby-chat-form') as HTMLFormElement;
+const lobbyChatInput = document.getElementById('lobby-chat-input') as HTMLInputElement;
+
+lobbyChatForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = lobbyChatInput?.value.trim();
+  if (!text) return;
+  appendLobbyChat(myPlayerName, text);
+  sfx('step');
+  lobbyChatInput.value = '';
+
+  const msgPayload = {
+    type: 'lobby_chat' as const,
+    sender: myPlayerName,
+    text,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+
+  if (isOnlineHost()) broadcastMessage(msgPayload);
+  else if (isOnlineClient()) sendToHost(msgPayload);
+});
+
+document.getElementById('lobby-btn-copy-link')?.addEventListener('click', () => {
+  const linkInput = document.getElementById('lobby-link-copy-val') as HTMLInputElement;
+  const url = linkInput?.value || window.location.href;
+  navigator.clipboard.writeText(url).then(() => {
+    toast('📋 Room invite link copied! Share with friends.', 'emerald');
+    sfx('cash');
+  }).catch(() => {
+    prompt('Copy this link to invite friends:', url);
+  });
+});
+
+document.getElementById('lobby-btn-leave')?.addEventListener('click', () => {
+  disconnectOnline();
+  currentLobbyPlayers = [];
+  showView('home');
+});
+
+document.getElementById('btn-leave-game')?.addEventListener('click', () => {
+  if (confirm('Leave match and return to Home? Your match progress will be lost.')) {
+    disconnectOnline();
+    S = null;
+    showView('home');
+  }
+});
+
+document.getElementById('brand-link')?.addEventListener('click', () => {
+  if (S) {
+    if (confirm('Exit current match to Home?')) {
+      disconnectOnline();
+      S = null;
+      showView('home');
+    }
+  } else {
+    disconnectOnline();
+    showView('home');
+  }
+});
+
+// ─── Attach Home Controls ─────────────────────────────────────────────────
+
+document.querySelectorAll<HTMLButtonElement>('#home-token-selector .token-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#home-token-selector .token-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    myTokenKey = (btn.dataset.token || 'tuktuk') as TokenKey;
+    sfx('click');
+  });
+});
+
+document.getElementById('home-btn-create-room')?.addEventListener('click', () => {
+  void handleCreateRoom();
+});
+
+document.getElementById('home-btn-join-room')?.addEventListener('click', () => {
+  void handleJoinRoom();
+});
+
+document.getElementById('home-btn-start-solo')?.addEventListener('click', () => {
+  ensureAudio();
+  sfx('click');
+
+  const pCount = parseInt((document.getElementById('home-solo-players') as HTMLSelectElement).value, 10) || 4;
+  const rounds = parseInt((document.getElementById('home-solo-rounds') as HTMLSelectElement).value, 10) || 25;
+  const cash = parseInt((document.getElementById('home-solo-cash') as HTMLSelectElement).value, 10) || 30000;
+  const hostName = (document.getElementById('home-host-name') as HTMLInputElement)?.value.trim() || 'Navindu';
+
+  const botNames = ['Sunil (Tuk Tycoon)', 'Anura (Tea Planter)', 'Kamal (Harbor Mogul)', 'Nimal (Gem Baron)', 'Priyani (Kandy Dancer)', 'Rohan (Train King)'];
+  const tokenKeys: TokenKey[] = ['elephant', 'dancer', 'train', 'gem', 'ship', 'tuktuk'];
+
+  const players: PlayerSetup[] = [{
+    name: hostName,
+    kind: 'human',
+    persona: 'opportunist',
+    tokenKey: myTokenKey,
+  }];
+
+  for (let i = 1; i < pCount; i++) {
+    players.push({
+      name: botNames[(i - 1) % botNames.length],
+      kind: 'bot',
+      persona: ['aggressive', 'conservative', 'risk', 'opportunist'][i % 4] as any,
+      tokenKey: tokenKeys[(i - 1) % tokenKeys.length],
+    });
+  }
+
+  S = createGame({
+    players,
+    seed: (Date.now() % 2147483647) | 0,
+    maxRounds: rounds,
+    startingCash: cash,
+  });
+
+  showView('game');
+  render(S, handlers);
+  scheduleBot();
+  toast('🎲 Solo match vs AI started!', 'emerald');
+});
+
+// ─── Initialization on Page Load ──────────────────────────────────────────
+
+refreshHeader();
+
+const urlParams = new URLSearchParams(window.location.search);
+const roomParam = urlParams.get('room');
+if (roomParam) {
+  const joinInput = document.getElementById('home-room-code') as HTMLInputElement;
+  if (joinInput) joinInput.value = roomParam;
+  toast(`Invite detected for room ${roomParam}! Click "Join Room" to enter.`, 'amber');
+}
+
+showView('home');
