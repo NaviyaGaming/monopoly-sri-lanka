@@ -246,27 +246,20 @@ function renderBoard(s: GameState, h: Handlers): void {
     grid.appendChild(cell);
   }
 
-  // ── Center hub ──
+  // ── Center hub (Richup.io Style) ──
   const center = document.createElement('div');
   center.id = 'board-center';
-  const cyc = currentCycle(s);
   center.innerHTML = `
-    <div class="hub-top">
-      <div class="hub-header-row">
-        <div class="hub-title">POLA · MONOPOLY LK</div>
-        <div id="turn-timer-badge" class="turn-timer-badge" title="Turn countdown timer" style="display: ${currentTimerVisible ? 'inline-flex' : 'none'};">
-          <span class="timer-icon">⏱️</span>
-          <span id="turn-timer-val">${currentTimerVal}s</span>
-        </div>
+    <div class="richup-center-wrapper">
+      <div id="turn-timer-badge" class="turn-timer-badge" style="display: ${currentTimerVisible ? 'inline-flex' : 'none'};">
+        <span class="timer-icon">⏱️</span>
+        <span id="turn-timer-val">${currentTimerVal}s</span>
       </div>
-      <div class="hub-cycle" title="${cyc.desc}">${cyc.icon} ${cycleName(cyc.id, cyc.name)} · ${s.cycleRoundsLeft}R</div>
-    </div>
-    <div class="hub-middle">
       <div class="dice-row" id="dice-holder"></div>
+      <div class="hub-actions" id="hub-actions"></div>
+      <div class="center-activity-feed" id="center-activity-feed"></div>
       <div id="popups"></div>
-      <div class="hub-card" id="hub-card"></div>
     </div>
-    <div class="hub-actions" id="hub-actions"></div>
   `;
   grid.appendChild(center);
 
@@ -293,115 +286,111 @@ function renderBoard(s: GameState, h: Handlers): void {
 }
 
 function renderHubCard(s: GameState, h: Handlers): void {
-  const card = document.getElementById('hub-card');
   const actions = document.getElementById('hub-actions');
-  const hubMiddle = document.querySelector<HTMLElement>('.hub-middle');
-  const diceHolder = document.getElementById('dice-holder');
-  if (!card || !actions) return;
-  card.innerHTML = '';
+  const feed = document.getElementById('center-activity-feed');
+  const popups = document.getElementById('popups');
+  if (!actions) return;
   actions.innerHTML = '';
 
-  const hasCard = s.phase !== 'preRoll' && s.phase !== 'gameOver';
-  if (hubMiddle) hubMiddle.classList.toggle('has-card', hasCard);
-  if (diceHolder) diceHolder.classList.toggle('compact', hasCard);
+  // 1. Center Activity Feed (Directly below buttons)
+  if (feed) {
+    const recent = s.log.slice(-3);
+    feed.innerHTML = recent.map(entry => `
+      <div class="feed-entry">${entry.text}</div>
+    `).join('');
+  }
 
-  if (s.phase === 'gameOver') return;
+  // 2. Card popup handler
+  if (popups) {
+    if (s.cardJustDrawn) {
+      const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
+      popups.innerHTML = cardPopupHtml(s, isMyTurn);
+      if (isMyTurn) {
+        document.getElementById('btn-card-ok')?.addEventListener('click', h.onCardOk);
+      }
+    } else {
+      popups.innerHTML = '';
+    }
+  }
 
-  const p = cur(s);
-  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
-  if (p.kind === 'bot') {
-    card.innerHTML = `<div class="ctx-card ai"><span class="ai-icon">${TOKENS[p.tokenKey].icon}</span><div><b>${p.name}</b><span class="dim">${t('aiThinking')}</span></div></div>`;
+  if (s.phase === 'gameOver') {
+    actions.innerHTML = `<button class="btn btn-richup-pill primary" id="btn-restart">🏆 Play Again</button>`;
+    bind('btn-restart', h.onRestart);
     return;
   }
 
-  const idx = p.position;
-  const def = BOARD[idx];
-  const st = s.squares[idx];
+  const p = cur(s);
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
 
   switch (s.phase) {
     case 'preRoll': {
       if (!isMyTurn) {
-        card.innerHTML = `<div class="ctx-card"><div><b>🎲 ${p.name}'s Turn</b><span class="dim">Waiting for ${p.name} to roll the dice...</span></div></div>`;
-        actions.innerHTML = `<div class="waiting-turn-banner"><span class="pulse-dot"></span> Waiting for <b>${p.name}</b> to roll...</div>`;
+        actions.innerHTML = `
+          <div class="richup-turn-status">
+            <span class="player-avatar-mini" style="background:${p.color}">${TOKENS[p.tokenKey].icon}</span>
+            <span><b>${p.name}</b> is rolling...</span>
+          </div>`;
         break;
       }
       if (p.inJail) {
-        card.innerHTML = `<div class="ctx-card amber"><div><b>⚖️ CID Inquiry</b><span class="dim">Attempt ${p.jailTurns}/3 — roll doubles or pay bail.</span></div></div>`;
         actions.innerHTML = `
-          <button class="btn btn-roll-hero" id="btn-roll"><span class="roll-icon">🎲</span> ${t('rollDice')}</button>
-          <button class="btn" id="btn-bail" ${p.cash < 500 ? 'disabled' : ''}>${t('payBail')}</button>`;
+          <button class="btn btn-richup-pill primary" id="btn-roll">🎲 Roll the dice</button>
+          <button class="btn btn-richup-pill outline" id="btn-bail" ${p.cash < 500 ? 'disabled' : ''}>⚖️ Pay bail ($500)</button>`;
         bind('btn-roll', h.onRoll);
         bind('btn-bail', h.onBail);
       } else {
-        card.innerHTML = `<div class="ctx-card"><div><b>🎲 ${p.name}'s Turn</b><span class="dim">Roll the dice to navigate Sri Lanka!</span></div></div>`;
         actions.innerHTML = `
-          <button class="btn btn-roll-hero" id="btn-roll"><span class="roll-icon">🎲</span> ${t('rollDice')}</button>`;
+          <button class="btn btn-richup-pill primary hero" id="btn-roll">🎲 Roll the dice</button>`;
         bind('btn-roll', h.onRoll);
       }
       break;
     }
     case 'decideBuy': {
       const bi = s.pendingBuy!;
-      const bdef = BOARD[bi];
       const price = squareValue(s, bi);
-      const gcolor = bdef.group ? GROUPS[bdef.group].color : '#10b981';
-      const perk = bdef.group ? GROUPS[bdef.group].perk : (bdef.kind === 'railway' ? 'Rent doubles with each station: 400 → 800 → 1,600 → 3,200.' : 'Rent = 80× dice (200× with both grids).');
       const afford = p.cash >= price;
-      const rentLine = bdef.rents
-        ? `Base rent: <b>LKR ${fmt(bdef.rents[0])}</b>${bdef.buildCost ? ` · House: <b>LKR ${fmt(buildCostOf(s, bi))}</b>` : ''}`
-        : perk;
-      card.innerHTML = `
-        <div class="ctx-card deed">
-          <div class="deed-head" style="background:${gcolor}"><span>🏠 ${squareName(bi, false, bdef.name, bdef.short)}</span><span class="pill">LKR ${fmt(price)}</span></div>
-          <div class="deed-body">
-            <div>${rentLine}</div>
-            <div class="dim perk">🌟 ${perk}</div>
-          </div>
-        </div>`;
       if (!isMyTurn) {
-        actions.innerHTML = `<div class="waiting-turn-banner"><span class="pulse-dot"></span> Waiting for <b>${p.name}</b> to buy or auction...</div>`;
+        actions.innerHTML = `
+          <div class="richup-turn-status">
+            <span class="player-avatar-mini" style="background:${p.color}">${TOKENS[p.tokenKey].icon}</span>
+            <span><b>${p.name}</b> is deciding...</span>
+          </div>`;
       } else {
         actions.innerHTML = `
-          <button class="btn primary" id="btn-buy" ${afford ? '' : 'disabled'}>🏠 ${t('buyProp')} · LKR ${fmt(price)}</button>
-          <button class="btn danger" id="btn-pass">🔨 ${t('auctionInstead')}</button>`;
+          <button class="btn btn-richup-pill outline" id="btn-pass">🔨 Auction</button>
+          <button class="btn btn-richup-pill primary" id="btn-buy" ${afford ? '' : 'disabled'}>🏷️ Buy for LKR ${fmt(price)}</button>`;
         bind('btn-buy', h.onBuy);
         bind('btn-pass', h.onPass);
       }
       break;
     }
     case 'postRoll': {
-      let ctx = '';
-      if (def.kind === 'bank' && p.loan === 0) {
-        const maxB = maxBorrowLimit(s, p.id);
-        ctx = `<div class="ctx-card amber"><div><b>🏦 Bank of Serendib — 10% preferential rate!</b><span class="dim">Credit line LKR ${fmt(maxB)} · 8-round fixed term</span></div></div>`;
-      } else if (def.kind === 'insurance') {
-        const unshielded = s.squares.map((x, i) => ({ x, i })).filter(o => o.x.owner === p.id && BOARD[o.i].kind === 'property' && o.x.shield === 0);
-        ctx = `<div class="ctx-card sky"><div><b>🛡️ Assurance Hub — 20% discount!</b><span class="dim">${unshielded.length > 0 ? `Protect ${BOARD[unshielded[0].i].name} (LKR ${fmt(Math.round(BOARD[unshielded[0].i].price! * 0.08))})` : 'Open the Shield tab to manage protection'}</span></div></div>`;
-      } else if (st.damaged && st.owner === p.id) {
-        ctx = `<div class="ctx-card rose"><div><b>⚠️ ${def.name} is storm-damaged</b><span class="dim">Rent suspended — repair for LKR 800 (Deed tab).</span></div></div>`;
-      } else if (s.cardJustDrawn) {
-        ctx = cardPopupHtml(s, isMyTurn);
-      } else {
-        ctx = `<div class="ctx-card"><div><b>${TOKENS[p.tokenKey].icon} ${p.name}'s turn</b><span class="dim">${isMyTurn ? 'Build, shield, bank or trade — then end your turn.' : `${p.name} is managing their empire...`}</span></div></div>`;
+      if (s.cardJustDrawn) {
+        if (isMyTurn) {
+          actions.innerHTML = `
+            <button class="btn btn-richup-pill primary" id="btn-card-ok-main">Collect & Continue ➜</button>`;
+          bind('btn-card-ok-main', h.onCardOk);
+        } else {
+          actions.innerHTML = `
+            <div class="richup-turn-status">
+              <span class="player-avatar-mini" style="background:${p.color}">${TOKENS[p.tokenKey].icon}</span>
+              <span><b>${p.name}</b> drew a card...</span>
+            </div>`;
+        }
+        break;
       }
-      card.innerHTML = ctx;
 
       if (!isMyTurn) {
-        actions.innerHTML = `<div class="waiting-turn-banner"><span class="pulse-dot"></span> Waiting for <b>${p.name}</b> to finish turn...</div>`;
+        actions.innerHTML = `
+          <div class="richup-turn-status">
+            <span class="player-avatar-mini" style="background:${p.color}">${TOKENS[p.tokenKey].icon}</span>
+            <span><b>${p.name}</b> is playing...</span>
+          </div>`;
       } else {
-        let transit = '';
-        if (canExpressTransit(s)) {
-          transit = `<button class="btn small" id="btn-transit-unowned">🛺 → Unowned</button><button class="btn small" id="btn-transit-bank">🏦 → Bank</button>`;
-        }
-        const endBtnText = s.hasBonusRoll ? '🎲 Roll Again (Doubles Bonus!)' : t('endTurn');
-        actions.innerHTML = `${transit}<button class="btn primary${s.hasBonusRoll ? ' gold' : ''}" id="btn-end">${endBtnText}</button>`;
+        const endBtnText = s.hasBonusRoll ? '🎲 Roll again' : '➜ End turn';
+        actions.innerHTML = `
+          <button class="btn btn-richup-pill primary" id="btn-end">${endBtnText}</button>`;
         bind('btn-end', h.onEndTurn);
-        bind('btn-transit-unowned', () => h.onTransit('unowned'));
-        bind('btn-transit-bank', () => h.onTransit('bank'));
-        if (s.cardJustDrawn) {
-          const ok = document.getElementById('btn-card-ok');
-          ok?.addEventListener('click', h.onCardOk);
-        }
       }
       break;
     }
@@ -643,12 +632,17 @@ function renderScoreboard(s: GameState, h: Handlers): void {
     const career = isMe ? loadCareer() : null;
     const rank = career ? getTycoonRank(career) : null;
     const rankTag = rank ? `<span class="rank-tag ${rank.borderClass}" title="${rank.desc}">${rank.badge} ${rank.title}</span>` : '';
+    const isCurrent = i === s.current && s.phase !== 'gameOver';
     return `
-      <div class="pcard${i === s.current && s.phase !== 'gameOver' ? ' current' : ''}${p.bankrupt ? ' bankrupt' : ''}${isMe ? ' is-me' : ''}" style="--pc:${p.color}">
-        <span class="picon">${TOKENS[p.tokenKey].icon}</span>
-        <div class="pinfo">
-          <div class="pname">${p.name}${youTag}${crown} <span class="pbadges">${badges}</span></div>
-          <div class="psub">${p.kind === 'bot' ? PERSONAS[p.persona].label : (isMe ? `${rankTag}` : 'Tycoon')} · ${props} props · Net LKR ${fmt(netWorth(s, p.id))}</div>
+      <div class="pcard richup-player-row${isCurrent ? ' active-turn current' : ''}${p.bankrupt ? ' bankrupt' : ''}${isMe ? ' is-me' : ''}" style="--pc:${p.color}">
+        <div class="player-left">
+          <div class="player-avatar" style="border-color:${p.color}; background:${p.color}28;">
+            <span>${TOKENS[p.tokenKey].icon}</span>
+          </div>
+          <div class="pinfo">
+            <div class="pname">${p.name}${youTag}${crown} <span class="pbadges">${badges}</span></div>
+            <div class="psub">${p.kind === 'bot' ? PERSONAS[p.persona].label : (isMe ? `${rankTag}` : 'Tycoon')} · ${props} props · Net LKR ${fmt(netWorth(s, p.id))}</div>
+          </div>
         </div>
         <div class="pcash">LKR ${fmt(p.cash)}</div>
       </div>
