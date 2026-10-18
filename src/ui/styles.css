@@ -93,8 +93,8 @@ body {
   width: min(100%, calc(100vh - 90px), 820px);
   aspect-ratio: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.75fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.75fr);
-  grid-template-rows: minmax(0, 1.75fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.75fr);
+  grid-template-columns: minmax(0, 1.25fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.25fr);
+  grid-template-rows: minmax(0, 1.25fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.25fr);
   gap: 3.5px;
   background: #071711;
   padding: 5px;
@@ -146,116 +146,128 @@ body {
 }
 
 /* ─── Corner Cells (Start, CID Visit, Poya Pool, Go to CID) ─── */
-.board-cell.edge-corner {
+.board-cell.edge-corner, .board-cell.corner-cell {
   background: #0b1f17;
   border-color: var(--line-soft);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 6px;
-  gap: 2px;
+  justify-content: space-between;
+  padding: 6px 4px 4px;
   text-align: center;
 }
-.board-cell.edge-corner .corner-icon {
-  font-size: clamp(18px, 2vw, 26px);
+.corner-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.corner-icon {
+  font-size: clamp(18px, 2vw, 24px);
   line-height: 1;
 }
-.board-cell.edge-corner .corner-title {
-  font-size: clamp(9.5px, 0.9vw, 12.5px);
+.corner-title {
+  font-size: clamp(9.5px, 0.88vw, 12px);
   font-weight: 900;
   color: #f1f5f9;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  line-height: 1.1;
 }
-.board-cell.edge-corner .corner-sub {
-  font-size: clamp(8px, 0.72vw, 10px);
+.corner-sub {
+  font-size: clamp(8px, 0.72vw, 9.5px);
   font-weight: 700;
   color: var(--gold);
 }
-
-/* ─── Left Edge (Squares 11-19: Maharagama, Katunayake, etc.) - Horizontal Layout ─── */
-.board-cell.edge-left {
+.corner-tokens-dock {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  padding: 3px 6px;
-  gap: 4px;
+  justify-content: center;
+  gap: 2px;
+  min-height: 16px;
+}
+.corner-tokens-dock:empty {
+  display: none;
 }
 
-/* ─── Right Edge (Squares 31-39: Jaffna Town, Nuwara Eliya, etc.) - Horizontal Layout ─── */
-.board-cell.edge-right {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3px 6px;
-  gap: 4px;
-}
-
-/* ─── Top Edge (Squares 21-29: Kandy City, Peradeniya, etc.) - Vertical Layout ─── */
-.board-cell.edge-top {
+/* ─── Clean Unpackfull Property & Special Cells ─────────────── */
+.board-cell:not(.corner-cell) {
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: space-between;
-  padding: 4px 2px;
+  align-items: center;
+  padding: 2px 2px 3px;
 }
 
-/* ─── Bottom Edge (Squares 1-9: Pettah, Maradana, etc.) - Vertical Layout ─── */
-.board-cell.edge-bottom {
+/* Top Bar: Group Color Strip or Special Category Icon */
+.cell-bar {
+  width: calc(100% - 4px);
+  height: 9px;
+  border-radius: 4px;
+  flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 2px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.cell-special-icon {
+  font-size: clamp(13px, 1.2vw, 17px);
+  flex: 0 0 auto;
+  line-height: 1;
+  margin-top: 1px;
 }
 
-/* ─── Unpackfull Clean Typography & Elements ───────────────── */
+/* Middle: Full Property Name — Unblocked and Unbroken */
 .cell-name-box {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-width: 0;
+  gap: 2.5px;
+  width: 100%;
   flex: 1;
-  text-align: center;
+  padding: 1px 2px;
+  box-sizing: border-box;
+  min-height: 0;
 }
 .cell-name-text {
-  font-size: clamp(8px, 0.75vw, 10.5px);
-  font-weight: 700;
-  color: #f1f5f9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-.edge-left .cell-name-text,
-.edge-right .cell-name-text {
-  font-size: clamp(8.5px, 0.82vw, 11px);
-}
-.coastal-dot {
-  font-size: 8px;
-  margin-left: 2px;
-  vertical-align: middle;
+  font-size: clamp(8px, 0.74vw, 10px);
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.15;
+  text-align: center;
+  word-break: normal;
+  overflow-wrap: normal;
+  display: block;
+  max-width: 100%;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 .cell-owner-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   flex: 0 0 auto;
 }
 
-/* ─── Richup-Style Subtle Price Pill ───────────────────────── */
+/* Bottom Foot: Price Pill & Dedicated Tokens Slot */
+.cell-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 16px;
+  flex: 0 0 auto;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
 .cell-pill.price-pill {
-  background: rgba(3, 14, 10, 0.75);
+  background: rgba(3, 14, 10, 0.82);
   border: 1px solid rgba(35, 75, 60, 0.85);
-  border-radius: 5px;
-  padding: 1.5px 5px;
-  font-size: clamp(7.5px, 0.72vw, 9.5px);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: clamp(7.5px, 0.7vw, 9px);
   font-weight: 800;
   color: #34d399;
   letter-spacing: 0.02em;
@@ -265,57 +277,36 @@ body {
 }
 .cell-pill.empty {
   visibility: hidden;
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
   flex: 0 0 auto;
 }
 
-/* ─── Group Badges & Icons (Facing into Board Center) ──────── */
-.cell-side-badge {
-  width: 8px;
-  height: calc(100% - 6px);
-  border-radius: 4px;
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-}
-.cell-side-icon {
-  font-size: clamp(12px, 1.2vw, 16px);
-  flex: 0 0 auto;
+/* Tokens Dock: Sits in Bottom Row, NEVER Overlaps the Name! */
+.cell-tokens-dock {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 20px;
-}
-.cell-top-bar {
-  height: 8px;
-  width: calc(100% - 8px);
-  border-radius: 4px;
+  justify-content: flex-end;
+  gap: 1.5px;
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  z-index: 10;
 }
-.cell-top-icon {
-  font-size: clamp(12px, 1.2vw, 16px);
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 18px;
+.cell-tokens-dock:empty {
+  display: none;
 }
+.cell-tokens-dock .token-3d-wrap,
+.corner-tokens-dock .token-3d-wrap {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.95));
+}
+
 .badge-houses {
-  font-size: 8px;
+  font-size: 7.5px;
   line-height: 1;
 }
 .badge-status {
-  font-size: 8px;
+  font-size: 7.5px;
   line-height: 1;
 }
 
@@ -324,21 +315,6 @@ body {
   opacity: 0.65;
   filter: grayscale(0.5);
   border-style: dashed !important;
-}
-
-/* ─── Docked Floating Player Tokens ────────────────────────── */
-.cell-tokens-dock {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  pointer-events: none;
-  z-index: 25;
-}
-.cell-tokens-dock:empty {
-  display: none;
 }
 
 /* 3D pedestal tokens */
