@@ -10,10 +10,10 @@ import {
   unmortgageSquare, validTrade,
 } from './engine/engine';
 import { botAct, botConsiderTrade, botToAct } from './engine/bots';
-import { render, setActiveTab, markLanded, setDiceClickHandler, setLocalPlayerId, type Handlers } from './ui/render';
+import { render, setActiveTab, markLanded, setDiceClickHandler, setLocalPlayerId, setTimerDisplay, type Handlers } from './ui/render';
 import { renderDice } from './ui/dice';
 import { TOKEN_AVATARS } from './ui/tokens';
-import { ensureAudio, floatCash, isMuted, popup, sfx, toast, toggleMute, tokenSfx } from './ui/fx';
+import { ensureAudio, floatCash, flyingCash, isMuted, popup, sfx, toast, toggleMute, tokenSfx } from './ui/fx';
 import { setLang, t } from './ui/i18n';
 import {
   createOnlineRoom, joinOnlineRoom, broadcastMessage, sendToHost,
@@ -102,20 +102,30 @@ async function perform(fn: (s: GameState) => void): Promise<void> {
     playOutcome(s.log.slice(before.logLen));
     s.players.forEach((p, i) => {
       const d = p.cash - before.cash[i];
-      if (d !== 0) floatCash(i, d);
+      if (d !== 0) {
+        floatCash(i, d);
+        if (i === myPlayerId || i === before.actor) {
+          flyingCash(d, d > 0);
+        }
+      }
     });
 
     render(s, handlers, myPlayerId);
+    resetTurnTimer();
 
     if (isOnlineHost()) {
       broadcastMessage({ type: 'state', state: s });
     }
 
-    if (s.phase === 'gameOver' && s.winner !== null) sfx('win');
+    if (s.phase === 'gameOver' && s.winner !== null) {
+      stopTurnTimer();
+      sfx('win');
+    }
     // Human card popup pauses bot pacing until OK is clicked.
     if (s.cardJustDrawn && s.players[s.current].kind === 'human') return;
   } finally {
     busy = false;
+    if (S && (S as any).phase === 'gameOver') stopTurnTimer();
     scheduleBot();
   }
 }
@@ -193,6 +203,87 @@ function scheduleBot(): void {
     if (!S || busy || S.phase === 'gameOver' || !botToAct(S)) return;
     await perform(s => botAct(s));
   }, fastMode ? 220 : BOT_STEP_MS);
+}
+
+// ─── Turn Countdown Timer (25s AFK & Pacing Protection) ───────────────────
+
+let turnTimerSeconds = 25;
+let turnTimerInterval: number | null = null;
+
+function stopTurnTimer(): void {
+  if (turnTimerInterval !== null) {
+    clearInterval(turnTimerInterval);
+    turnTimerInterval = null;
+  }
+  setTimerDisplay(25, false, false);
+}
+
+function resetTurnTimer(): void {
+  stopTurnTimer();
+  if (!S || S.phase === 'gameOver') return;
+
+  const activeP = S.phase === 'auction' && S.auction ? S.players[auctionCurrentBidder(S)] : S.players[S.current];
+  // If active player is a bot, hide timer
+  if (activeP.kind === 'bot') {
+    setTimerDisplay(0, false, false);
+    return;
+  }
+
+  // Active human player
+  const duration = S.phase === 'auction' ? 12 : 25;
+  turnTimerSeconds = duration;
+  setTimerDisplay(turnTimerSeconds, false, true);
+
+  turnTimerInterval = window.setInterval(() => {
+    if (!S || S.phase === 'gameOver' || busy) return;
+    turnTimerSeconds--;
+
+    if (turnTimerSeconds <= 5 && turnTimerSeconds > 0) {
+      sfx('tick');
+      setTimerDisplay(turnTimerSeconds, true, true);
+    } else if (turnTimerSeconds > 5) {
+      setTimerDisplay(turnTimerSeconds, false, true);
+    } else if (turnTimerSeconds <= 0) {
+      stopTurnTimer();
+      handleTurnTimeout();
+    }
+  }, 1000);
+}
+
+function handleTurnTimeout(): void {
+  if (!S || busy || S.phase === 'gameOver') return;
+
+  // If this is an online client, send the timeout action for their own turn to host
+  if (isOnlineClient()) {
+    const activeId = S.phase === 'auction' && S.auction ? auctionCurrentBidder(S) : S.current;
+    if (activeId === myPlayerId) {
+      if (S.phase === 'preRoll') {
+        handlers.onRoll();
+      } else if (S.phase === 'decideBuy') {
+        handlers.onPass();
+      } else if (S.phase === 'postRoll') {
+        handlers.onEndTurn();
+      } else if (S.phase === 'auction') {
+        handlers.onWithdraw();
+      }
+    }
+    return;
+  }
+
+  // Host or solo authoritative execution
+  if (S.phase === 'preRoll') {
+    toast(`⏱️ Turn timer expired — auto-rolling!`, 'amber');
+    void perform(s => takeTurnRoll(s));
+  } else if (S.phase === 'decideBuy') {
+    toast(`⏱️ Decision timer expired — property sent to auction!`, 'amber');
+    void perform(s => declineCurrent(s));
+  } else if (S.phase === 'postRoll') {
+    toast(`⏱️ Turn timer expired — ending turn!`, 'amber');
+    void perform(s => { s.cardJustDrawn = null; endTurn(s); });
+  } else if (S.phase === 'auction') {
+    toast(`⏱️ Auction timer expired — passing!`, 'amber');
+    void perform(s => auctionPass(s));
+  }
 }
 
 // ─── Client Action Delegation (WebRTC sync) ───────────────────────────────
@@ -277,6 +368,7 @@ const handlers: Handlers = {
   })),
   onRestart: () => {
     if (confirm('Start a new game?')) {
+      stopTurnTimer();
       disconnectOnline();
       S = null;
       showView('home');
@@ -658,9 +750,11 @@ async function handleJoinRoom(): Promise<void> {
           S = msg.state;
           showView('game');
           render(S, handlers, myPlayerId);
+          resetTurnTimer();
         } else if (msg.type === 'state') {
           S = msg.state;
           render(S, handlers, myPlayerId);
+          resetTurnTimer();
         } else if (msg.type === 'lobby_chat') {
           appendLobbyChat(msg.sender, msg.text);
         } else if (msg.type === 'chat') {
@@ -749,6 +843,7 @@ document.getElementById('lobby-btn-start-game')?.addEventListener('click', () =>
   broadcastMessage({ type: 'start_game', state: S });
   showView('game');
   render(S, handlers, myPlayerId);
+  resetTurnTimer();
   scheduleBot();
   toast('🎮 Match launched! May the best tycoon win!', 'emerald');
 });
@@ -787,6 +882,7 @@ document.getElementById('lobby-btn-copy-link')?.addEventListener('click', () => 
 });
 
 document.getElementById('lobby-btn-leave')?.addEventListener('click', () => {
+  stopTurnTimer();
   disconnectOnline();
   currentLobbyPlayers = [];
   showView('home');
@@ -794,6 +890,7 @@ document.getElementById('lobby-btn-leave')?.addEventListener('click', () => {
 
 document.getElementById('btn-leave-game')?.addEventListener('click', () => {
   if (confirm('Leave match and return to Home? Your match progress will be lost.')) {
+    stopTurnTimer();
     disconnectOnline();
     S = null;
     showView('home');
@@ -803,11 +900,13 @@ document.getElementById('btn-leave-game')?.addEventListener('click', () => {
 document.getElementById('brand-link')?.addEventListener('click', () => {
   if (S) {
     if (confirm('Exit current match to Home?')) {
+      stopTurnTimer();
       disconnectOnline();
       S = null;
       showView('home');
     }
   } else {
+    stopTurnTimer();
     disconnectOnline();
     showView('home');
   }
@@ -872,13 +971,84 @@ document.getElementById('home-btn-start-solo')?.addEventListener('click', () => 
 
   showView('game');
   render(S, handlers, myPlayerId);
+  resetTurnTimer();
   scheduleBot();
   toast('🎲 Solo match vs AI started!', 'emerald');
 });
 
+// ─── Rules Modal Controller ───────────────────────────────────────────────
+
+function initRulesModal(): void {
+  const modal = document.getElementById('modal-rules');
+  const openBtn = document.getElementById('btn-open-rules');
+  const closeBtn = document.getElementById('btn-close-rules');
+  const prevBtn = document.getElementById('rules-prev-btn') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('rules-next-btn') as HTMLButtonElement | null;
+  const counterText = document.getElementById('rules-counter-text');
+  const tabBtns = document.querySelectorAll<HTMLButtonElement>('.rules-tab-btn');
+  const slides = document.querySelectorAll<HTMLElement>('.rules-slide');
+
+  let currentSlide = 0;
+
+  function setSlide(idx: number): void {
+    currentSlide = Math.max(0, Math.min(2, idx));
+    slides.forEach((sl, i) => sl.classList.toggle('active', i === currentSlide));
+    tabBtns.forEach((tb, i) => tb.classList.toggle('active', i === currentSlide));
+    if (counterText) counterText.textContent = `Step ${currentSlide + 1} of 3`;
+    if (prevBtn) prevBtn.disabled = currentSlide === 0;
+    if (nextBtn) {
+      nextBtn.textContent = currentSlide === 2 ? 'Done / Play! 🚀' : 'Next Step ▶';
+    }
+  }
+
+  function openRules(): void {
+    if (!modal) return;
+    sfx('cardflip');
+    setSlide(0);
+    modal.classList.remove('hidden');
+  }
+
+  function closeRules(): void {
+    if (!modal) return;
+    modal.classList.add('hidden');
+  }
+
+  openBtn?.addEventListener('click', openRules);
+  closeBtn?.addEventListener('click', closeRules);
+
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) closeRules();
+  });
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.slide || '0');
+      sfx('step');
+      setSlide(idx);
+    });
+  });
+
+  prevBtn?.addEventListener('click', () => {
+    if (currentSlide > 0) {
+      sfx('step');
+      setSlide(currentSlide - 1);
+    }
+  });
+
+  nextBtn?.addEventListener('click', () => {
+    if (currentSlide < 2) {
+      sfx('step');
+      setSlide(currentSlide + 1);
+    } else {
+      closeRules();
+    }
+  });
+}
+
 // ─── Initialization on Page Load ──────────────────────────────────────────
 
 refreshHeader();
+initRulesModal();
 
 const urlParams = new URLSearchParams(window.location.search);
 const roomParam = urlParams.get('room');

@@ -56,6 +56,22 @@ let activeTab: TabId = 'deed';
 let diceClickHandler: (() => void) | null = null;
 let landedSquare: number | null = null;
 let localPlayerId: number | null = null;
+let currentTimerVal = 25;
+let currentTimerUrgent = false;
+let currentTimerVisible = false;
+
+export function setTimerDisplay(seconds: number, urgent: boolean, visible: boolean): void {
+  currentTimerVal = seconds;
+  currentTimerUrgent = urgent;
+  currentTimerVisible = visible;
+  const badge = document.getElementById('turn-timer-badge');
+  const val = document.getElementById('turn-timer-val');
+  if (badge && val) {
+    badge.style.display = visible ? 'inline-flex' : 'none';
+    val.textContent = `${seconds}s`;
+    badge.classList.toggle('urgent', urgent);
+  }
+}
 
 export function setActiveTab(tab: string): void {
   if (['deed', 'bank', 'insure', 'trade', 'log'].includes(tab)) {
@@ -211,7 +227,13 @@ function renderBoard(s: GameState, h: Handlers): void {
   const cyc = currentCycle(s);
   center.innerHTML = `
     <div class="hub-top">
-      <div class="hub-title">POLA · MONOPOLY LK</div>
+      <div class="hub-header-row">
+        <div class="hub-title">POLA · MONOPOLY LK</div>
+        <div id="turn-timer-badge" class="turn-timer-badge" title="Turn countdown timer" style="display: ${currentTimerVisible ? 'inline-flex' : 'none'};">
+          <span class="timer-icon">⏱️</span>
+          <span id="turn-timer-val">${currentTimerVal}s</span>
+        </div>
+      </div>
       <div class="hub-cycle" title="${cyc.desc}">${cyc.icon} ${cycleName(cyc.id, cyc.name)} · ${s.cycleRoundsLeft}R</div>
     </div>
     <div class="hub-middle">
@@ -222,6 +244,11 @@ function renderBoard(s: GameState, h: Handlers): void {
     <div class="hub-actions" id="hub-actions"></div>
   `;
   grid.appendChild(center);
+
+  const timerBadge = center.querySelector<HTMLElement>('#turn-timer-badge');
+  if (timerBadge && currentTimerUrgent) {
+    timerBadge.classList.add('urgent');
+  }
 
   const holder = center.querySelector<HTMLElement>('#dice-holder')!;
   void renderDice(holder, s.lastRoll);

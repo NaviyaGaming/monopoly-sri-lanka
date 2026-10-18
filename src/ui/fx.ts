@@ -48,11 +48,14 @@ function voice(
 export type SfxName =
   | 'dice' | 'step' | 'tuktuk' | 'dancer' | 'elephant' | 'train'
   | 'buy' | 'cash' | 'gavel' | 'fanfare' | 'alert' | 'click' | 'win'
-  | 'cardflip' | 'tuktuk_ride' | 'emote' | 'gem';
+  | 'cardflip' | 'tuktuk_ride' | 'emote' | 'gem' | 'tick';
 
 export function sfx(name: SfxName): void {
   if (!audio || muted) return;
   switch (name) {
+    case 'tick': // countdown tick
+      voice('sine', 920, 920, 0, 0.035, 0.05);
+      break;
     case 'dice': // multi-clack tumble
       [0, 0.06, 0.13, 0.21, 0.3, 0.42].forEach((offset, i) => {
         voice('triangle', 220 + i * 55, 480 + i * 40, offset, 0.055, 0.11);
@@ -127,10 +130,28 @@ export function sfx(name: SfxName): void {
   }
 }
 
-
 /** Play the character sound of a player's 3D token. */
 export function tokenSfx(sound: 'tuktuk' | 'dancer' | 'elephant' | 'train'): void {
   sfx(sound);
+}
+
+/** Flying banknotes across the board for juice when money changes hands */
+export function flyingCash(amount: number, isGain = true): void {
+  const board = document.getElementById('board-grid') || document.body;
+  const count = Math.min(7, Math.max(3, Math.ceil(Math.abs(amount) / 1000)));
+
+  for (let i = 0; i < count; i++) {
+    const bill = document.createElement('div');
+    bill.className = `flying-bill ${isGain ? 'gain' : 'loss'}`;
+    bill.innerHTML = `💵 <b>${isGain ? '+' : '−'}LKR</b>`;
+    bill.style.left = `${45 + (Math.random() - 0.5) * 16}%`;
+    bill.style.top = `${50 + (Math.random() - 0.5) * 14}%`;
+    bill.style.setProperty('--dx', `${(Math.random() - 0.5) * 240}px`);
+    bill.style.setProperty('--dy', `${isGain ? -(70 + Math.random() * 110) : (70 + Math.random() * 110)}px`);
+    bill.style.setProperty('--rot', `${(Math.random() - 0.5) * 50}deg`);
+    board.appendChild(bill);
+    setTimeout(() => bill.remove(), 1250);
+  }
 }
 
 // ─── Center-stage floating popups ─────────────────────────────────────────
