@@ -18,7 +18,7 @@ import {
 } from '../engine/engine';
 import { renderDice } from './dice';
 import { TOKEN_AVATARS } from './tokens';
-import { confetti } from './fx';
+import { confetti, sfx } from './fx';
 import { cycleName, getLang, squareName, t } from './i18n';
 import { loadCareer, getTycoonRank, recordMatchResult } from '../engine/career';
 import './styles.css';
@@ -73,10 +73,21 @@ export function setTimerDisplay(seconds: number, urgent: boolean, visible: boole
   currentTimerVisible = visible;
   const badge = document.getElementById('turn-timer-badge');
   const val = document.getElementById('turn-timer-val');
+  const track = document.getElementById('turn-progress-track');
+  const fill = document.getElementById('turn-progress-fill');
   if (badge && val) {
     badge.style.display = visible ? 'inline-flex' : 'none';
     val.textContent = `${seconds}s`;
     badge.classList.toggle('urgent', urgent);
+  }
+  if (track && fill) {
+    track.style.display = visible ? 'block' : 'none';
+    const pct = Math.max(0, Math.min(100, (seconds / 30) * 100));
+    fill.style.width = `${pct}%`;
+    fill.classList.toggle('urgent', urgent);
+  }
+  if (urgent && visible && seconds <= 5 && seconds > 0) {
+    sfx('tick');
   }
 }
 
@@ -239,9 +250,7 @@ function renderBoard(s: GameState, h: Handlers): void {
       activeTab = 'deed';
       render(s, h);
       h.onSelectSquare(i);
-      if (window.innerWidth <= 900) {
-        openMobileTileSheet(s, i, h);
-      }
+      openMobileTileSheet(s, i, h);
     });
     grid.appendChild(cell);
   }
@@ -254,6 +263,9 @@ function renderBoard(s: GameState, h: Handlers): void {
       <div id="turn-timer-badge" class="turn-timer-badge" style="display: ${currentTimerVisible ? 'inline-flex' : 'none'};">
         <span class="timer-icon">⏱️</span>
         <span id="turn-timer-val">${currentTimerVal}s</span>
+      </div>
+      <div class="turn-progress-track" id="turn-progress-track" style="display: ${currentTimerVisible ? 'block' : 'none'};">
+        <div class="turn-progress-fill${currentTimerUrgent ? ' urgent' : ''}" id="turn-progress-fill" style="width: ${Math.max(0, Math.min(100, (currentTimerVal / 30) * 100))}%;"></div>
       </div>
       <div class="dice-row" id="dice-holder"></div>
       <div class="hub-actions" id="hub-actions"></div>
@@ -315,7 +327,7 @@ function renderHubCard(s: GameState, h: Handlers): void {
 
   if (s.phase === 'gameOver') {
     actions.innerHTML = `<button class="btn btn-richup-pill primary" id="btn-restart">🏆 Play Again</button>`;
-    bind('btn-restart', h.onRestart);
+    bind('btn-restart', () => { sfx('click'); h.onRestart(); });
     return;
   }
 
@@ -336,12 +348,12 @@ function renderHubCard(s: GameState, h: Handlers): void {
         actions.innerHTML = `
           <button class="btn btn-richup-pill primary" id="btn-roll">🎲 Roll the dice</button>
           <button class="btn btn-richup-pill outline" id="btn-bail" ${p.cash < 500 ? 'disabled' : ''}>⚖️ Pay bail ($500)</button>`;
-        bind('btn-roll', h.onRoll);
-        bind('btn-bail', h.onBail);
+        bind('btn-roll', () => { sfx('dice'); h.onRoll(); });
+        bind('btn-bail', () => { sfx('click'); h.onBail(); });
       } else {
         actions.innerHTML = `
           <button class="btn btn-richup-pill primary hero" id="btn-roll">🎲 Roll the dice</button>`;
-        bind('btn-roll', h.onRoll);
+        bind('btn-roll', () => { sfx('dice'); h.onRoll(); });
       }
       break;
     }
@@ -359,8 +371,8 @@ function renderHubCard(s: GameState, h: Handlers): void {
         actions.innerHTML = `
           <button class="btn btn-richup-pill outline" id="btn-pass">🔨 Auction</button>
           <button class="btn btn-richup-pill primary" id="btn-buy" ${afford ? '' : 'disabled'}>🏷️ Buy for LKR ${fmt(price)}</button>`;
-        bind('btn-buy', h.onBuy);
-        bind('btn-pass', h.onPass);
+        bind('btn-buy', () => { sfx('buy'); h.onBuy(); });
+        bind('btn-pass', () => { sfx('gavel'); h.onPass(); });
       }
       break;
     }
@@ -369,7 +381,7 @@ function renderHubCard(s: GameState, h: Handlers): void {
         if (isMyTurn) {
           actions.innerHTML = `
             <button class="btn btn-richup-pill primary" id="btn-card-ok-main">Collect & Continue ➜</button>`;
-          bind('btn-card-ok-main', h.onCardOk);
+          bind('btn-card-ok-main', () => { sfx('click'); h.onCardOk(); });
         } else {
           actions.innerHTML = `
             <div class="richup-turn-status">
@@ -390,7 +402,7 @@ function renderHubCard(s: GameState, h: Handlers): void {
         const endBtnText = s.hasBonusRoll ? '🎲 Roll again' : '➜ End turn';
         actions.innerHTML = `
           <button class="btn btn-richup-pill primary" id="btn-end">${endBtnText}</button>`;
-        bind('btn-end', h.onEndTurn);
+        bind('btn-end', () => { sfx('click'); h.onEndTurn(); });
       }
       break;
     }
@@ -493,6 +505,7 @@ export function openMobileTileSheet(s: GameState, idx: number, h: Handlers): voi
   const body = document.getElementById('sheet-body-content');
   const scrim = document.getElementById('sheet-scrim');
   if (!sheet || !body) return;
+  sfx('cardflip');
 
   const def = BOARD[idx];
   const st = s.squares[idx];
@@ -524,12 +537,18 @@ export function openMobileTileSheet(s: GameState, idx: number, h: Handlers): voi
     const canBuild = isProp && def.group && ownsMonopoly(s, curP.id, def.group) && st.buildings < 5 && !st.mortgaged && !st.damaged && curP.cash >= buildCostOf(s, idx);
     const canRepair = st.damaged && curP.cash >= 800;
     const canShield = isProp && st.shield < 3 && !st.mortgaged;
+    const canMort = canMortgageSquare(s, idx);
+    const canUnmort = canUnmortgageSquare(s, idx);
+    const canDemol = canSellBuildingAt(s, idx);
 
     actionsHtml = `
       <div class="sheet-action-buttons">
-        ${canBuild ? `<button class="btn small primary" id="sheet-btn-build">🏗️ Build House (LKR ${fmt(buildCostOf(s, idx))})</button>` : ''}
-        ${canRepair ? `<button class="btn small gold" id="sheet-btn-repair">🔧 Repair (LKR 800)</button>` : ''}
-        ${canShield ? `<button class="btn small sky" id="sheet-btn-shield">🛡️ Add Shield</button>` : ''}
+        ${canBuild ? `<button class="btn btn-richup-pill primary" id="sheet-btn-build">🏗️ Build (LKR ${fmt(buildCostOf(s, idx))})</button>` : ''}
+        ${canRepair ? `<button class="btn btn-richup-pill gold" id="sheet-btn-repair">🔧 Repair (LKR 800)</button>` : ''}
+        ${canShield ? `<button class="btn btn-richup-pill outline" id="sheet-btn-shield">🛡️ Shield</button>` : ''}
+        ${canMort ? `<button class="btn btn-richup-pill outline" id="sheet-btn-mortgage">📜 Mortgage (+LKR ${fmt(def.mortgageValue ?? 1000)})</button>` : ''}
+        ${canUnmort ? `<button class="btn btn-richup-pill outline" id="sheet-btn-unmortgage">🔓 Unmortgage (-LKR ${fmt(Math.round((def.mortgageValue ?? 1000) * 1.1))})</button>` : ''}
+        ${canDemol ? `<button class="btn btn-richup-pill danger" id="sheet-btn-demolish">🏚️ Sell Building</button>` : ''}
       </div>`;
   }
 
@@ -570,22 +589,44 @@ export function openMobileTileSheet(s: GameState, idx: number, h: Handlers): voi
   sheet.classList.remove('hidden');
 
   document.getElementById('sheet-btn-close')?.addEventListener('click', () => {
+    sfx('click');
     sheet.classList.add('hidden');
   });
   if (scrim) {
-    scrim.onclick = () => sheet.classList.add('hidden');
+    scrim.onclick = () => {
+      sfx('click');
+      sheet.classList.add('hidden');
+    };
   }
 
   document.getElementById('sheet-btn-build')?.addEventListener('click', () => {
+    sfx('click');
     h.onBuild(idx);
     sheet.classList.add('hidden');
   });
   document.getElementById('sheet-btn-repair')?.addEventListener('click', () => {
+    sfx('click');
     h.onRepair(idx);
     sheet.classList.add('hidden');
   });
   document.getElementById('sheet-btn-shield')?.addEventListener('click', () => {
+    sfx('click');
     h.onShield(idx, 1);
+    sheet.classList.add('hidden');
+  });
+  document.getElementById('sheet-btn-mortgage')?.addEventListener('click', () => {
+    sfx('click');
+    h.onMortgage(idx);
+    sheet.classList.add('hidden');
+  });
+  document.getElementById('sheet-btn-unmortgage')?.addEventListener('click', () => {
+    sfx('click');
+    h.onUnmortgage(idx);
+    sheet.classList.add('hidden');
+  });
+  document.getElementById('sheet-btn-demolish')?.addEventListener('click', () => {
+    sfx('click');
+    h.onSellBuilding(idx);
     sheet.classList.add('hidden');
   });
 }
@@ -1272,6 +1313,44 @@ function renderOverlay(s: GameState, h: Handlers): void {
         <h1>${t('champion')}</h1>
         <p class="winner-line">${s.winner !== null ? `👑 <strong>${s.players[s.winner].name}</strong> dominates the island with LKR ${fmt(netWorth(s, s.winner))}!` : 'Everyone went bankrupt — the bank wins.'}</p>
 
+        <!-- 🏆 Richup-Style Victory Podium -->
+        <div class="podium-container">
+          ${standings[1] ? `
+            <div class="podium-slot slot-2">
+              <div class="podium-avatar" style="border-color:${standings[1].color}; background:${standings[1].color}24;">
+                ${TOKENS[standings[1].tokenKey].icon}
+              </div>
+              <div class="podium-name">${standings[1].name}</div>
+              <div class="podium-net">LKR ${fmt(netWorth(s, standings[1].id))}</div>
+              <div class="podium-pedestal p2">
+                <span class="podium-badge">🥈 2nd</span>
+              </div>
+            </div>` : ''}
+          ${standings[0] ? `
+            <div class="podium-slot slot-1">
+              <div class="podium-crown">👑</div>
+              <div class="podium-avatar" style="border-color:${standings[0].color}; background:${standings[0].color}24;">
+                ${TOKENS[standings[0].tokenKey].icon}
+              </div>
+              <div class="podium-name">${standings[0].name}</div>
+              <div class="podium-net">LKR ${fmt(netWorth(s, standings[0].id))}</div>
+              <div class="podium-pedestal p1">
+                <span class="podium-badge">🥇 1st</span>
+              </div>
+            </div>` : ''}
+          ${standings[2] ? `
+            <div class="podium-slot slot-3">
+              <div class="podium-avatar" style="border-color:${standings[2].color}; background:${standings[2].color}24;">
+                ${TOKENS[standings[2].tokenKey].icon}
+              </div>
+              <div class="podium-name">${standings[2].name}</div>
+              <div class="podium-net">LKR ${fmt(netWorth(s, standings[2].id))}</div>
+              <div class="podium-pedestal p3">
+                <span class="podium-badge">🥉 3rd</span>
+              </div>
+            </div>` : ''}
+        </div>
+
         <!-- Career Rank Banner -->
         <div class="game-over-rank-banner ${rank.borderClass}">
           <span class="rank-icon">${rank.badge}</span>
@@ -1294,10 +1373,11 @@ function renderOverlay(s: GameState, h: Handlers): void {
         ${generateAccoladesHtml(s)}
 
         ${s.players.some(p => p.bankrupt) ? `<p class="dim fell-along">Fell along the way: ${s.players.filter(p => p.bankrupt).map(p => p.name).join(', ')}.</p>` : ''}
-        <button class="btn gold btn-large" id="btn-restart">${t('playAgain')}</button>
+        <button class="btn btn-richup-pill primary hero btn-large" id="btn-restart" style="margin: 12px auto 0; display: inline-flex;">${t('playAgain')}</button>
       </div>`;
     confetti(ov);
     bind('btn-restart', () => {
+      sfx('click');
       hasRecordedCareerThisMatch = false;
       h.onRestart();
     });
@@ -1387,10 +1467,10 @@ function renderOverlay(s: GameState, h: Handlers): void {
       </div>`;
 
     if (isHumanBidder) {
-      bind('btn-bid-250', () => h.onBid(250));
-      bind('btn-bid-500', () => h.onBid(500));
-      bind('btn-bid-1000', () => h.onBid(1000));
-      bind('btn-auction-pass', h.onWithdraw);
+      bind('btn-bid-250', () => { sfx('gavel'); h.onBid(250); });
+      bind('btn-bid-500', () => { sfx('gavel'); h.onBid(500); });
+      bind('btn-bid-1000', () => { sfx('gavel'); h.onBid(1000); });
+      bind('btn-auction-pass', () => { sfx('click'); h.onWithdraw(); });
     }
     return;
   }
