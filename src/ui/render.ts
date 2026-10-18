@@ -214,12 +214,13 @@ function renderBoard(s: GameState, h: Handlers): void {
   grid.appendChild(center);
 
   const holder = center.querySelector<HTMLElement>('#dice-holder')!;
+  void renderDice(holder, s.lastRoll);
   const humanPreRoll = s.phase === 'preRoll' && cur(s).kind === 'human';
   if (humanPreRoll && diceClickHandler) {
     holder.classList.add('clickable');
+    holder.title = '🎲 Click dice to roll!';
     holder.addEventListener('click', () => diceClickHandler!());
   }
-  void renderDice(holder, s.lastRoll);
 
   renderHubCard(s, h);
   landedSquare = null;
@@ -427,7 +428,7 @@ function renderDeedTab(s: GameState, h: Handlers): void {
 
     box.innerHTML = `
       <div class="deed-tab">
-        <div class="deed-head" style="background:${g.color}"><span>${def.name}</span><span class="pill">${st.owner === null ? `LKR ${fmt(squareValue(s, idx))}` : (st.mortgaged ? 'MORTGAGED' : '')}</span></div>
+        <div class="deed-head" style="background:${g.color}"><span>🏠 ${squareName(idx, false, def.name, def.short)}</span><span class="pill">${st.owner === null ? `LKR ${fmt(squareValue(s, idx))}` : (st.mortgaged ? 'MORTGAGED' : '')}</span></div>
         <div class="deed-tab-body">
           <div class="row"><span class="dim">${g.name} district</span><span>${owner ? `<b style="color:${owner.color}">${TOKENS[owner.tokenKey].icon} ${owner.name}</b>${hasMono ? ' 🌟' : ''}` : 'Unowned (Bank)'}</span></div>
           <div class="row"><span class="dim">Development</span><span><b>${st.buildings === 5 ? '🏨 Boutique Hotel' : `${st.buildings} Houses`}</b>${shieldLabel}${st.damaged ? ' · ⚠️ Damaged' : ''}${mortgageLabel}${conditionLabel}${st.loanLocked ? ' · 🔒 Loan-locked' : ''}</span></div>
@@ -459,7 +460,7 @@ function renderDeedTab(s: GameState, h: Handlers): void {
       : 'Rent = 80 × dice (200 × dice with both grids).';
     box.innerHTML = `
       <div class="deed-tab">
-        <div class="deed-head plain"><span>${def.icon} ${def.name}</span><span class="pill">${st.owner === null ? `LKR ${fmt(squareValue(s, idx))}` : (st.mortgaged ? 'MORTGAGED' : '')}</span></div>
+        <div class="deed-head plain"><span>${def.icon} ${squareName(idx, false, def.name, def.short)}</span><span class="pill">${st.owner === null ? `LKR ${fmt(squareValue(s, idx))}` : (st.mortgaged ? 'MORTGAGED' : '')}</span></div>
         <div class="deed-tab-body">
           <div class="row"><span class="dim">Owner</span><span>${owner ? `<b style="color:${owner.color}">${owner.name}</b>${st.mortgaged ? ' (Mortgaged)' : ''}` : 'Unowned (Bank)'}</span></div>
           <p class="dim">${rentLine}</p>

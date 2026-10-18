@@ -64,6 +64,7 @@ export function createGame(opts: { players: PlayerSetup[]; seed: number; maxRoun
     auction: null,
     pendingBuy: null,
     lastRoll: null,
+    totalRolls: 0,
     selectedSquare: 0,
     cardJustDrawn: null,
     pendingTrade: null,
@@ -173,6 +174,7 @@ export function takeTurnRoll(s: GameState): void {
   const p = cur(s);
   const d = rollDice(s);
   s.lastRoll = d;
+  s.totalRolls = (s.totalRolls || 0) + 1;
   const sum = d[0] + d[1];
   const isDouble = d[0] === d[1];
   log(s, `${p.name} rolls ${d[0]} + ${d[1]} = ${sum}${isDouble ? ' (DOUBLES! 🎲🎲)' : ''}.`, 'info');

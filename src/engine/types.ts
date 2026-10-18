@@ -116,6 +116,7 @@ export interface GameState {
   auction: AuctionState | null;
   pendingBuy: number | null;
   lastRoll: [number, number] | null;
+  totalRolls?: number;
   selectedSquare: number;
   cardJustDrawn: { deck: 'community' | 'headline'; index: number; delta: number } | null;
   pendingTrade: TradeOffer | null; // awaiting human partner decision (pass & play)

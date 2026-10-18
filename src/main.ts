@@ -31,6 +31,7 @@ interface Snapshot {
   cash: number[];
   logLen: number;
   roll: [number, number] | null;
+  totalRolls: number;
 }
 
 function snap(s: GameState): Snapshot {
@@ -40,6 +41,7 @@ function snap(s: GameState): Snapshot {
     cash: s.players.map(p => p.cash),
     logLen: s.log.length,
     roll: s.lastRoll ? [...s.lastRoll] as [number, number] : null,
+    totalRolls: s.totalRolls ?? 0,
   };
 }
 
@@ -50,10 +52,9 @@ async function perform(fn: (s: GameState) => void): Promise<void> {
     const before = snap(S);
     fn(S);
     const s = S;
-    const rolled = s.lastRoll !== null
-      && (before.roll === null || s.lastRoll[0] !== before.roll[0] || s.lastRoll[1] !== before.roll[1]);
+    const rolled = (s.totalRolls ?? 0) > before.totalRolls;
 
-    if (rolled) {
+    if (rolled && s.lastRoll) {
       sfx('dice');
       const holder = document.getElementById('dice-holder');
       if (holder) await renderDice(holder, s.lastRoll, fastMode ? 300 : 720);
