@@ -21,6 +21,7 @@ import {
   isOnlineHost, isOnlineClient, disconnectOnline,
   type LobbyPlayer, type LobbySettings,
 } from './network/p2p';
+import { showSpeechBubble, triggerBotBanter } from './ui/banter';
 
 let S: GameState | null = null;
 let busy = false;
@@ -90,6 +91,9 @@ async function perform(fn: (s: GameState) => void): Promise<void> {
       sfx('dice');
       const holder = document.getElementById('dice-holder');
       if (holder) await renderDice(holder, s.lastRoll, fastMode ? 300 : 720);
+      if (s.lastRoll[0] === s.lastRoll[1] && s.players[before.actor].kind === 'bot') {
+        triggerBotBanter(s.players[before.actor].persona, before.actor, 'roll_doubles');
+      }
     }
 
     const from = before.pos[before.actor];
@@ -184,6 +188,16 @@ function playOutcome(entries: LogEntry[]): void {
     if (/FORECLOSED|foreclosed/.test(e.text)) popup('🚨 Loan Default', 'Collateral seized', 'rose');
     if (/MONOPOLY UNLOCKED/.test(e.text)) popup('🌟 Monopoly!', 'District perk active', 'emerald');
     if (/damaged /.test(e.text)) popup('⛈️ Disaster!', 'Repair needed', 'rose');
+
+    if (S) {
+      const actor = S.players[S.current];
+      if (actor && actor.kind === 'bot') {
+        if (/ purchased /.test(e.text)) triggerBotBanter(actor.persona, actor.id, 'buy');
+        else if (/CID Inquiry!$/.test(e.text)) triggerBotBanter(actor.persona, actor.id, 'jail');
+        else if (/BANKRUPTCY/.test(e.text)) triggerBotBanter(actor.persona, actor.id, 'bankrupt');
+        else if (/ paid LKR .* rent/.test(e.text)) triggerBotBanter(actor.persona, actor.id, 'rent_pay');
+      }
+    }
   }
   if (entries.some(e => e.kind === 'danger')) { sfx('alert'); return; }
   if (/ wins? the auction|AUCTION WON/.test(text)) { sfx('gavel'); return; }
@@ -384,7 +398,9 @@ const handlers: Handlers = {
   onEmote: (emoji: string) => {
     if (!S) return;
     sfx('emote');
-    const p = S.players[S.current];
+    const myIdx = myPlayerId ?? S.current;
+    const p = S.players[myIdx];
+    showSpeechBubble(myIdx, emoji);
     popup(`${p.name}: ${emoji}`, 'reaction', 'amber');
     if (isOnlineHost()) broadcastMessage({ type: 'emote', sender: p.name, emoji });
     else if (isOnlineClient()) sendToHost({ type: 'emote', sender: p.name, emoji });
@@ -676,6 +692,10 @@ async function handleCreateRoom(): Promise<void> {
         } else if (msg.type === 'emote') {
           sfx('emote');
           popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+          if (S) {
+            const pIdx = S.players.findIndex(p => p.name === msg.sender);
+            if (pIdx >= 0) showSpeechBubble(pIdx, msg.emoji);
+          }
           broadcastMessage(msg);
         }
       },
@@ -785,6 +805,10 @@ async function handleJoinRoom(): Promise<void> {
         } else if (msg.type === 'emote') {
           sfx('emote');
           popup(`${msg.sender}: ${msg.emoji}`, 'reaction', 'amber');
+          if (S) {
+            const pIdx = S.players.findIndex(p => p.name === msg.sender);
+            if (pIdx >= 0) showSpeechBubble(pIdx, msg.emoji);
+          }
         }
       },
       () => {
@@ -1129,8 +1153,68 @@ function initRulesModal(): void {
   });
 }
 
+// ─── WhatsApp 1-Tap Invite Sharing ─────────────────────────────────────────
+
+function shareOnWhatsApp(roomCode?: string): void {
+  const code = roomCode || (document.getElementById('lobby-code-display')?.textContent || '').replace('ROOM CODE:', '').trim();
+  const url = window.location.origin + window.location.pathname + (code && !code.includes('XXXX') ? `?room=${code}` : '');
+  const text = encodeURIComponent(`Hey! 🛺 Join my POLA Sri Lanka Monopoly match!\nRoom Code: ${code}\nTap link to play on mobile or PC:\n${url}`);
+  window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+}
+
+document.getElementById('lobby-btn-whatsapp')?.addEventListener('click', () => shareOnWhatsApp());
+document.getElementById('btn-whatsapp-chat-share')?.addEventListener('click', () => {
+  const roomCode = isOnlineHost() || isOnlineClient() ? (document.getElementById('lobby-code-display')?.textContent || '').replace('ROOM CODE:', '').trim() : undefined;
+  shareOnWhatsApp(roomCode);
+});
+
+// ─── Cinematic Ceylon Splash Loader ───────────────────────────────────────
+
+function initAppLoader(): void {
+  const loader = document.getElementById('app-loader');
+  const bar = document.getElementById('loader-progress-bar');
+  const status = document.getElementById('loader-status-msg');
+  const pct = document.getElementById('loader-percent');
+  const tip = document.getElementById('loader-trivia-text');
+  if (!loader || !bar || !status || !pct) return;
+
+  const tips = [
+    'Did you know? Avurudu Start awards LKR 3,000 harvest bonus on every trip around the island!',
+    'Tip: Coastal beach resorts generate bonus tourism dividends in peak seasons!',
+    'Tip: Shield your properties in the Shield tab before Southwest Monsoon strikes!',
+    'Tip: Owning Colombo Fort, Kandy Rail, and Galle Rail multiplies your commuter tariffs!',
+    'Tip: Bank of Serendib provides emergency collateral loans when short on cash!',
+  ];
+
+  const steps = [
+    { p: 25, msg: 'Calibrating Serendib economic simulation engine...' },
+    { p: 55, msg: 'Loading 40 iconic Sri Lankan districts & deeds...' },
+    { p: 80, msg: 'Initializing AI tycoon investment personalities...' },
+    { p: 100, msg: 'Welcome to POLA Sri Lanka!' },
+  ];
+
+  let curStep = 0;
+  const interval = setInterval(() => {
+    if (curStep < steps.length) {
+      const s = steps[curStep];
+      bar.style.width = `${s.p}%`;
+      pct.textContent = `${s.p}%`;
+      status.textContent = s.msg;
+      if (tip && tips[curStep]) tip.textContent = tips[curStep];
+      curStep++;
+    } else {
+      clearInterval(interval);
+      setTimeout(() => {
+        loader.classList.add('fade-out');
+        setTimeout(() => loader.remove(), 550);
+      }, 350);
+    }
+  }, 240);
+}
+
 // ─── Initialization on Page Load ──────────────────────────────────────────
 
+initAppLoader();
 refreshHeader();
 initRulesModal();
 
@@ -1143,3 +1227,4 @@ if (roomParam) {
 }
 
 showView('home');
+

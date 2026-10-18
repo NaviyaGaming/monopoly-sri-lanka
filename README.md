@@ -11,7 +11,19 @@ Buy the island, navigate economic cycles, trade estates, and bankrupt your rival
 
 ### 🌿 Sri Lankan Emerald & Gold Aesthetic
 - **Distraction-Free Elegance:** Clean, modern, high-contrast dark palette (`#0b1914` background, deep emerald `#0f2920` panels, `#10b981` accents, and `#fbbf24` gold highlights).
+- **Full Unbroken Place Names:** Unwrapped, clean, legible Sri Lankan district labels across all 40 tiles with bottom-docked player tokens that never obscure location names.
 - **Zero-Glow Minimalist Polish:** Subtle borders and crisp typography optimized for clarity and speed without blinding glow effects.
+
+### 🌟 Cinematic Ceylon Splash Screen
+- **Authentic Island Lore:** Animated dual-orbit gold emblem rings, floating sparkles, bouncing Tuk-Tuk `🛺`, and tumbling dice.
+- **Rotating Economic Trivia:** Real-time progress calibration paired with insightful Sri Lankan trading tips and cultural trivia.
+
+### 💬 AI Tycoon Banter & Speech Bubbles
+- **Contextual In-Game Speech:** Bots react dynamically to doubles rolls, aggressive buyouts, hefty rent payments, CID arrests, and auction battles with speech bubbles over their player cards.
+- **Interactive Emotes:** Send one-tap emoji reactions (😂, 💸, 🛺, 👑, 💀, 🔥) that pop up directly on player cards for both local bots and live P2P opponents.
+
+### 📲 1-Tap WhatsApp Room Invites
+- **Instant Social Play:** One-click WhatsApp sharing from both the waiting lobby and the in-game chat header with auto-formatted game links and room codes.
 
 ### 🎲 Tactile White Dice & Direct Action Hub
 - **Tactile 3D White Dice:** Beautifully weighted, rounded white cubes with contrast pips, authentic tumble physics, and subtle resting tilt.
@@ -23,10 +35,14 @@ Buy the island, navigate economic cycles, trade estates, and bankrupt your rival
 - **Deed Badges:** Immediate visual breakdown of owned districts, utilities, and railway lines.
 - **Universal Deed Inspector:** Tap any property cell on the board or in player cards to open the complete property deed sheet with full rent tiers and mortgage details.
 
+### 🏦 Bank of Serendib & Disaster Shields
+- **Collateral Loans:** Borrow up to 50% of your real estate equity from the Bank of Serendib to survive rent crunches.
+- **Disaster Shielding:** Fortify properties against monsoon storms, power cuts, and municipal tariffs with Tier 1–3 insurance shields.
+
 ### 🌐 Peer-to-Peer Online Multiplayer
 - **Instant Rooms:** Create a private room or join via a 4-letter room code.
 - **Direct WebRTC P2P:** Zero-latency peer-to-peer gameplay powered by PeerJS.
-- **Live In-Game Chat:** Taunt opponents or negotiate deals in real time.
+- **Live In-Game Chat:** Taunt opponents or negotiate deals in real time with quick-share WhatsApp integration.
 
 ### 🤝 Bilateral Visual Trade Desk
 - Select any player to propose custom trades: package deeds and cash sweeteners with instant bot or human evaluation.
@@ -133,11 +149,12 @@ npm run deploy     # Deploys dist/ to GitHub Pages
 ## 🗺️ Roadmap & Milestones
 
 - [x] **Phase 1: Foundation & Economy Engine** — Deterministic 40-tile Sri Lankan board, 4 bot personas, and dynamic macro-economy.
-- [x] **Phase 2: Minimalist UI Overhaul** — Tactile white dice, center action pills, right-side player cards, and Sri Lankan Emerald & Gold palette.
-- [x] **Phase 3: Multiplayer & Interaction** — P2P WebRTC online rooms, live auction hall, and visual trade desk.
+- [x] **Phase 2: Minimalist UI Overhaul** — Tactile white dice, center action pills, right-side player cards, unbroken names, and Sri Lankan Emerald & Gold palette.
+- [x] **Phase 3: Multiplayer & Interaction** — P2P WebRTC online rooms, live auction hall, 1-tap WhatsApp sharing, and visual trade desk.
 - [x] **Phase 4: Analytics & Victory** — Interactive net-worth timeline chart, podium accolades, and persistent career XP.
-- [ ] **Phase 5: Bank of Serendib** — Mortgages, loans, and property insurance policies.
-- [ ] **Phase 6: Native Mobile & Localisation** — Sinhala / Tamil localization and Capacitor mobile wrappers.
+- [x] **Phase 5: Bank of Serendib & Risk Hedging** — Mortgages, collateral debt restructuring, and Tier 1–3 disaster shields.
+- [x] **Phase 6: Immersion & Social Banter** — Cinematic Ceylon splash loader, AI tycoon speech bubbles, and live player emoji reactions.
+- [ ] **Phase 7: Native Mobile & Multi-Language** — Sinhala / Tamil localization and Capacitor mobile wrappers.
 
 ---
 
