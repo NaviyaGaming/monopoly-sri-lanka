@@ -81,104 +81,265 @@ body {
 
 /* ─── Layout ─────────────────────────────────────────────── */
 #layout {
-  flex: 1; display: flex; gap: 14px; padding: 14px;
-  align-items: flex-start; max-width: 1500px; margin: 0 auto; width: 100%;
+  flex: 1; display: flex; gap: 16px; padding: 12px 16px;
+  align-items: center; justify-content: center; max-width: 1560px; margin: 0 auto; width: 100%;
+  box-sizing: border-box;
 }
-#board-wrap { flex: 1 1 auto; display: flex; justify-content: center; min-width: 0; }
-#side { flex: 0 0 360px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+#board-wrap { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; min-width: 0; }
+#side { flex: 0 0 315px; max-height: min(calc(100vh - 80px), 840px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 
-/* ─── Board ──────────────────────────────────────────────── */
+/* ─── Board (Richup.io Inspired Clean Proportions) ────────── */
 #board-grid {
-  width: min(100%, 88vh);
+  width: min(100%, calc(100vh - 90px), 820px);
   aspect-ratio: 1;
   display: grid;
-  grid-template-columns: repeat(11, minmax(0, 1fr));
-  grid-template-rows: repeat(11, minmax(0, 1fr));
-  gap: 3px;
-  background: var(--panel);
-  padding: 4px;
-  border-radius: 14px;
-  border: 2px solid var(--line-soft);
+  grid-template-columns: minmax(0, 1.75fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.75fr);
+  grid-template-rows: minmax(0, 1.75fr) repeat(9, minmax(0, 1fr)) minmax(0, 1.75fr);
+  gap: 3.5px;
+  background: #071711;
+  padding: 5px;
+  border-radius: 16px;
+  border: 1.5px solid var(--line-soft);
   position: relative;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
 }
 .board-cell {
-  background: #132a22;
+  background: #112820;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  display: flex; flex-direction: column; justify-content: space-between;
-  padding: 1px 2px 2px;
-  cursor: pointer; position: relative; overflow: hidden;
+  border-radius: 7px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
   transition: border-color 0.15s ease, transform 0.15s ease;
-  min-width: 0; min-height: 0;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
 }
-.board-cell:hover { border-color: var(--gold); transform: translateY(-1px); z-index: 10; }
+.board-cell:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+  z-index: 10;
+}
 .board-cell.is-owned {
-  background: var(--owner-bg, #132a22);
+  background: var(--owner-bg, #112820);
   border-color: var(--owner-border, var(--line));
 }
-.board-cell.selected-cell { outline: 2px solid var(--gold); background: #1e4235; z-index: 15; box-shadow: none; }
-.board-cell.active-player-cell { outline: 2px solid var(--emerald); background: rgba(16, 185, 129, 0.2); z-index: 18; box-shadow: none; }
-.board-cell.landed { animation: landPulse 0.6s ease; z-index: 12; }
-.coastal-dot { font-size: 8px; margin-left: 2px; vertical-align: middle; }
+.board-cell.selected-cell {
+  outline: 2px solid var(--gold);
+  background: #183e30;
+  z-index: 15;
+  box-shadow: none;
+}
+.board-cell.active-player-cell {
+  outline: 2px solid var(--emerald);
+  background: rgba(16, 185, 129, 0.22);
+  z-index: 18;
+  box-shadow: none;
+}
+.board-cell.landed {
+  animation: landPulse 0.6s ease;
+  z-index: 12;
+}
 @keyframes landPulse {
   0% { outline: 2px solid var(--gold); }
   100% { outline: none; }
 }
-.board-cell.corner-cell {
-  background: #0f241c;
-  border-color: var(--line);
+
+/* ─── Corner Cells (Start, CID Visit, Poya Pool, Go to CID) ─── */
+.board-cell.edge-corner {
+  background: #0b1f17;
+  border-color: var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  gap: 2px;
+  text-align: center;
 }
-.board-cell.is-mortgaged {
-  opacity: 0.72;
-  filter: grayscale(0.45);
-  background: #18221d;
-  border-style: dashed;
+.board-cell.edge-corner .corner-icon {
+  font-size: clamp(18px, 2vw, 26px);
+  line-height: 1;
 }
-.board-cell.is-mortgaged::after {
-  content: '🔒 MORTGAGED';
-  position: absolute;
-  top: 45%; left: 50%;
-  transform: translate(-50%, -50%) rotate(-20deg);
-  font-size: 6.5px;
+.board-cell.edge-corner .corner-title {
+  font-size: clamp(9.5px, 0.9vw, 12.5px);
   font-weight: 900;
-  color: #fca5a5;
-  background: rgba(12, 25, 20, 0.9);
-  padding: 1px 3px;
-  border: 1px solid #ef4444;
-  border-radius: 3px;
-  pointer-events: none;
-  white-space: nowrap;
+  color: #f1f5f9;
   letter-spacing: 0.04em;
-  z-index: 5;
+  text-transform: uppercase;
 }
-.cell-bar {
-  height: 9px; border-radius: 4px 4px 0 0; flex: 0 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 3px; font-size: 7.5px; line-height: 1;
+.board-cell.edge-corner .corner-sub {
+  font-size: clamp(8px, 0.72vw, 10px);
+  font-weight: 700;
+  color: var(--gold);
 }
-.cell-bar.pos-left, .cell-bar.pos-right { display: none; } /* side bars kept simple */
-.cell-icon { text-align: center; font-size: clamp(9px, 1.1vw, 15px); }
-.cell-name {
-  font-size: clamp(7.5px, 0.78vw, 10.5px); font-weight: 800; line-height: 1.15;
-  text-align: center; color: #f1f5f9; padding: 1px 1px 0;
-  flex: 0 0 auto;
-  word-break: break-word;
+
+/* ─── Left Edge (Squares 11-19: Maharagama, Katunayake, etc.) - Horizontal Layout ─── */
+.board-cell.edge-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  gap: 4px;
+}
+
+/* ─── Right Edge (Squares 31-39: Jaffna Town, Nuwara Eliya, etc.) - Horizontal Layout ─── */
+.board-cell.edge-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  gap: 4px;
+}
+
+/* ─── Top Edge (Squares 21-29: Kandy City, Peradeniya, etc.) - Vertical Layout ─── */
+.board-cell.edge-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+}
+
+/* ─── Bottom Edge (Squares 1-9: Pettah, Maradana, etc.) - Vertical Layout ─── */
+.board-cell.edge-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+}
+
+/* ─── Unpackfull Clean Typography & Elements ───────────────── */
+.cell-name-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  text-align: center;
+}
+.cell-name-text {
+  font-size: clamp(8px, 0.75vw, 10.5px);
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  max-height: 24px;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
-.cell-tokens {
-  display: flex; align-items: center; justify-content: center; gap: 1px; flex-wrap: wrap;
-  min-height: 12px; flex: 1 1 auto; max-height: 22px;
+.edge-left .cell-name-text,
+.edge-right .cell-name-text {
+  font-size: clamp(8.5px, 0.82vw, 11px);
 }
-.cell-owner {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 8px; font-weight: 800; padding: 0 3px; flex: 0 0 auto;
+.coastal-dot {
+  font-size: 8px;
+  margin-left: 2px;
+  vertical-align: middle;
 }
-.owner-stripe { height: 3.5px; border-radius: 2px; flex: 0 0 auto; margin-top: 1px; }
-.cell-price { text-align: center; font-size: 8px; font-weight: 700; color: var(--muted); flex: 0 0 auto; }
+.cell-owner-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  flex: 0 0 auto;
+}
+
+/* ─── Richup-Style Subtle Price Pill ───────────────────────── */
+.cell-pill.price-pill {
+  background: rgba(3, 14, 10, 0.75);
+  border: 1px solid rgba(35, 75, 60, 0.85);
+  border-radius: 5px;
+  padding: 1.5px 5px;
+  font-size: clamp(7.5px, 0.72vw, 9.5px);
+  font-weight: 800;
+  color: #34d399;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  line-height: 1.1;
+  flex: 0 0 auto;
+}
+.cell-pill.empty {
+  visibility: hidden;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+}
+
+/* ─── Group Badges & Icons (Facing into Board Center) ──────── */
+.cell-side-badge {
+  width: 8px;
+  height: calc(100% - 6px);
+  border-radius: 4px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.cell-side-icon {
+  font-size: clamp(12px, 1.2vw, 16px);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+}
+.cell-top-bar {
+  height: 8px;
+  width: calc(100% - 8px);
+  border-radius: 4px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.cell-top-icon {
+  font-size: clamp(12px, 1.2vw, 16px);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+}
+.badge-houses {
+  font-size: 8px;
+  line-height: 1;
+}
+.badge-status {
+  font-size: 8px;
+  line-height: 1;
+}
+
+/* ─── Mortgaged State (Unobtrusive) ────────────────────────── */
+.board-cell.is-mortgaged {
+  opacity: 0.65;
+  filter: grayscale(0.5);
+  border-style: dashed !important;
+}
+
+/* ─── Docked Floating Player Tokens ────────────────────────── */
+.cell-tokens-dock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 25;
+}
+.cell-tokens-dock:empty {
+  display: none;
+}
 
 /* 3D pedestal tokens */
 .token-3d-wrap {
@@ -903,7 +1064,7 @@ body {
 
 /* ─── Richup-Style Left Chat & Activity Panel ────────────── */
 #chat-panel {
-  flex: 0 0 280px; height: calc(100vh - 80px);
+  flex: 0 0 250px; height: min(calc(100vh - 80px), 840px);
   background: rgba(13, 31, 24, 0.9);
   border: 1px solid var(--line-soft);
   border-radius: 14px;

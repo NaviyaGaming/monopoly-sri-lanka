@@ -182,17 +182,25 @@ function renderBoard(s: GameState, h: Handlers): void {
     const cell = document.createElement('div');
     const isHere = active !== null && !active.bankrupt && active.position === i;
     const isSelected = s.selectedSquare === i && !isHere;
-    cell.className = `board-cell${i % 10 === 0 ? ' corner-cell' : ''}${isHere ? ' active-player-cell' : ''}${isSelected ? ' selected-cell' : ''}${i === landedSquare ? ' landed' : ''}${st.mortgaged ? ' is-mortgaged' : ''}`;
-    cell.style.gridRow = String(pos.row);
-    cell.style.gridColumn = String(pos.col);
-    cell.dataset.idx = String(i);
+    const isCorner = i % 10 === 0;
+
+    let edgeClass = 'edge-bottom';
+    if (isCorner) {
+      edgeClass = 'edge-corner';
+    } else if (i > 10 && i < 20) {
+      edgeClass = 'edge-left';
+    } else if (i > 20 && i < 30) {
+      edgeClass = 'edge-top';
+    } else if (i > 30 && i < 40) {
+      edgeClass = 'edge-right';
+    }
 
     const owner = st.owner !== null ? s.players[st.owner] : null;
     const isOwnerCell = owner !== null;
-    cell.className = `board-cell${i % 10 === 0 ? ' corner-cell' : ''}${isHere ? ' active-player-cell' : ''}${isSelected ? ' selected-cell' : ''}${i === landedSquare ? ' landed' : ''}${st.mortgaged ? ' is-mortgaged' : ''}${isOwnerCell ? ' is-owned' : ''}`;
+    cell.className = `board-cell ${edgeClass}${isCorner ? ' corner-cell' : ''}${isHere ? ' active-player-cell' : ''}${isSelected ? ' selected-cell' : ''}${i === landedSquare ? ' landed' : ''}${st.mortgaged ? ' is-mortgaged' : ''}${isOwnerCell ? ' is-owned' : ''}`;
     if (isOwnerCell) {
       cell.style.setProperty('--owner-bg', `${owner.color}24`);
-      cell.style.setProperty('--owner-border', `${owner.color}88`);
+      cell.style.setProperty('--owner-border', `${owner.color}aa`);
     }
     cell.style.gridRow = String(pos.row);
     cell.style.gridColumn = String(pos.col);
@@ -202,22 +210,7 @@ function renderBoard(s: GameState, h: Handlers): void {
     const rentDetails = def.rents ? `Rent: LKR ${st.buildings > 0 ? def.rents[st.buildings] : def.rents[0]}` : (def.price ? `Price: LKR ${def.price}` : '');
     cell.title = `${def.name}\n${owner ? `Owner: ${owner.name}` : (def.price ? `Unowned · LKR ${def.price}` : '')}\n${rentDetails}`;
 
-    // Top color bar with build/shield/damage/mortgage icons.
-    let topBar = '';
-    if (def.group && def.kind === 'property') {
-      const buildIcons = st.buildings === 5
-        ? '<span class="mini-hotel-3d" title="Luxury Boutique Hotel">🏨</span>'
-        : st.buildings > 0
-          ? `<span class="mini-houses-3d" title="${st.buildings} Houses">${'🏠'.repeat(st.buildings)}</span>`
-          : '';
-      const shieldIcon = st.shield === 3 ? '👑' : st.shield === 2 ? '🔰' : st.shield === 1 ? '🛡️' : '';
-      const statusIcons = `${shieldIcon}${st.damaged ? '⚠️' : ''}${st.mortgaged ? '🔒' : ''}`;
-      topBar = `<div class="cell-bar" style="background:${GROUPS[def.group].color}"><span>${buildIcons}</span><span>${statusIcons}</span></div>`;
-    } else {
-      topBar = `<div class="cell-icon">${st.mortgaged ? '🔒' : def.icon ?? ''}</div>`;
-    }
-
-    // 3D pedestal tokens standing here.
+    // 3D pedestal tokens standing here
     const tokensHere = s.players
       .filter(p => !p.bankrupt && p.position === i)
       .map(p => {
@@ -225,15 +218,115 @@ function renderBoard(s: GameState, h: Handlers): void {
         return `<span class="token-3d-wrap${isHere && active?.id === p.id ? ' token-active' : ''}" title="${p.name} (${av.names[getLang()]})">${av.svg(p.color)}</span>`;
       })
       .join('');
+    const tokenDock = tokensHere ? `<div class="cell-tokens-dock">${tokensHere}</div>` : '';
 
     const hint = priceHint(s, i);
+    const pricePill = hint ? `<span class="cell-pill price-pill">${hint}</span>` : '<span class="cell-pill empty"></span>';
+    const nameText = squareName(i, true, def.name, def.short);
     const coastalBadge = def.coastal ? '<span class="coastal-dot" title="Coastal Resort">🌊</span>' : '';
-    const nameHtml = `<div class="cell-name">${squareName(i, true, def.name, def.short)}${coastalBadge}</div>`;
-    const ownerHtml = owner
-      ? `<div class="cell-owner" style="color:${owner.color}"><span>${owner.tokenKey ? TOKENS[owner.tokenKey].icon : ''}</span><span>${hint}</span></div><div class="owner-stripe" style="background:${owner.color}"></div>`
-      : `<div class="cell-price">${hint}</div>`;
+    const ownerDot = owner ? `<span class="cell-owner-dot" style="background:${owner.color}" title="Owner: ${owner.name}"></span>` : '';
 
-    cell.innerHTML = `${topBar}${nameHtml}<div class="cell-tokens">${tokensHere}</div>${ownerHtml}`;
+    if (isCorner) {
+      let cornerIcon = def.icon ?? '🏛️';
+      let cornerTitle = '';
+      let cornerSub = '';
+      if (i === 0) {
+        cornerIcon = '🎊';
+        cornerTitle = 'START';
+        cornerSub = `+${(startBonus(s) / 1000).toFixed(1)}k`;
+      } else if (i === 10) {
+        cornerIcon = '⚖️';
+        cornerTitle = 'CID VISIT';
+        cornerSub = 'Visiting';
+      } else if (i === 20) {
+        cornerIcon = '🌕';
+        cornerTitle = 'POYA POOL';
+        cornerSub = `+${((s.poyaPool || 1000) / 1000).toFixed(1)}k`;
+      } else if (i === 30) {
+        cornerIcon = '🚨';
+        cornerTitle = 'GO TO CID';
+        cornerSub = 'Audit';
+      }
+      cell.innerHTML = `
+        <div class="corner-icon">${cornerIcon}</div>
+        <div class="corner-title">${cornerTitle}</div>
+        <div class="corner-sub">${cornerSub}</div>
+        ${tokenDock}
+      `;
+    } else if (edgeClass === 'edge-left') {
+      let groupHtml = '';
+      if (def.group && def.kind === 'property') {
+        const buildIcons = st.buildings === 5 ? '🏨' : st.buildings > 0 ? `${st.buildings}🏠` : '';
+        const statusDot = st.damaged ? '⚠️' : st.mortgaged ? '🔒' : '';
+        groupHtml = `<div class="cell-side-badge" style="background:${GROUPS[def.group].color}" title="${GROUPS[def.group].name}"><span class="badge-houses">${buildIcons}</span><span class="badge-status">${statusDot}</span></div>`;
+      } else {
+        groupHtml = `<div class="cell-side-icon">${st.mortgaged ? '🔒' : def.icon ?? ''}</div>`;
+      }
+      cell.innerHTML = `
+        ${pricePill}
+        <div class="cell-name-box">
+          ${ownerDot}
+          <span class="cell-name-text">${nameText}${coastalBadge}</span>
+        </div>
+        ${groupHtml}
+        ${tokenDock}
+      `;
+    } else if (edgeClass === 'edge-right') {
+      let groupHtml = '';
+      if (def.group && def.kind === 'property') {
+        const buildIcons = st.buildings === 5 ? '🏨' : st.buildings > 0 ? `${st.buildings}🏠` : '';
+        const statusDot = st.damaged ? '⚠️' : st.mortgaged ? '🔒' : '';
+        groupHtml = `<div class="cell-side-badge" style="background:${GROUPS[def.group].color}" title="${GROUPS[def.group].name}"><span class="badge-houses">${buildIcons}</span><span class="badge-status">${statusDot}</span></div>`;
+      } else {
+        groupHtml = `<div class="cell-side-icon">${st.mortgaged ? '🔒' : def.icon ?? ''}</div>`;
+      }
+      cell.innerHTML = `
+        ${groupHtml}
+        <div class="cell-name-box">
+          ${ownerDot}
+          <span class="cell-name-text">${nameText}${coastalBadge}</span>
+        </div>
+        ${pricePill}
+        ${tokenDock}
+      `;
+    } else if (edgeClass === 'edge-top') {
+      let groupHtml = '';
+      if (def.group && def.kind === 'property') {
+        const buildIcons = st.buildings === 5 ? '🏨' : st.buildings > 0 ? `${'🏠'.repeat(st.buildings)}` : '';
+        const statusDot = st.damaged ? '⚠️' : st.mortgaged ? '🔒' : '';
+        groupHtml = `<div class="cell-top-bar" style="background:${GROUPS[def.group].color}" title="${GROUPS[def.group].name}"><span class="badge-houses">${buildIcons}</span><span class="badge-status">${statusDot}</span></div>`;
+      } else {
+        groupHtml = `<div class="cell-top-icon">${st.mortgaged ? '🔒' : def.icon ?? ''}</div>`;
+      }
+      cell.innerHTML = `
+        ${pricePill}
+        <div class="cell-name-box">
+          ${ownerDot}
+          <span class="cell-name-text">${nameText}${coastalBadge}</span>
+        </div>
+        ${groupHtml}
+        ${tokenDock}
+      `;
+    } else {
+      let groupHtml = '';
+      if (def.group && def.kind === 'property') {
+        const buildIcons = st.buildings === 5 ? '🏨' : st.buildings > 0 ? `${'🏠'.repeat(st.buildings)}` : '';
+        const statusDot = st.damaged ? '⚠️' : st.mortgaged ? '🔒' : '';
+        groupHtml = `<div class="cell-top-bar" style="background:${GROUPS[def.group].color}" title="${GROUPS[def.group].name}"><span class="badge-houses">${buildIcons}</span><span class="badge-status">${statusDot}</span></div>`;
+      } else {
+        groupHtml = `<div class="cell-top-icon">${st.mortgaged ? '🔒' : def.icon ?? ''}</div>`;
+      }
+      cell.innerHTML = `
+        ${groupHtml}
+        <div class="cell-name-box">
+          ${ownerDot}
+          <span class="cell-name-text">${nameText}${coastalBadge}</span>
+        </div>
+        ${pricePill}
+        ${tokenDock}
+      `;
+    }
+
     cell.addEventListener('click', () => {
       s.selectedSquare = i;
       activeTab = 'deed';
