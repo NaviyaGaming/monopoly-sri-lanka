@@ -1,121 +1,144 @@
-# POLA 🏪
+# POLA 🏪 — Sri Lankan Property Trading Game
 
-**A Sri Lankan property trading game — by PixalAI.**
+**A high-stakes Sri Lankan property trading and economic simulation game — crafted by PixalAI.**
 
-Buy the island, survive the economy, send your friends to the Rest House.
-POLA is a web-based property game inspired by the MONOPOLY-LK design, rebuilt
-as a real product: you play against four AI opponents with distinct investment
-personalities, on a board that behaves like the Sri Lankan economy — inflation
-cycles, property booms and busts, national event cards, and government
-regulations.
-
-> **Why "Pola"?** *Pola* (පොළ) is the Sinhala word for marketplace. It's short,
-> brandable, and legally clean — no Hasbro trademarks anywhere.
+Buy the island, navigate economic cycles, trade estates, and bankrupt your rivals!  
+**POLA** (*පොළ* — marketplace) is a modern web-based property game inspired by the Sri Lankan economy. It combines classic property trading with dynamic macroeconomic cycles (inflation, district booms & busts, fuel crises, government regulations), intelligent AI tycoons, and peer-to-peer online multiplayer.
 
 ---
 
-## Run it
+## 🌟 Key Features
 
+### 🌿 Sri Lankan Emerald & Gold Aesthetic
+- **Distraction-Free Elegance:** Clean, modern, high-contrast dark palette (`#0b1914` background, deep emerald `#0f2920` panels, `#10b981` accents, and `#fbbf24` gold highlights).
+- **Zero-Glow Minimalist Polish:** Subtle borders and crisp typography optimized for clarity and speed without blinding glow effects.
+
+### 🎲 Tactile White Dice & Direct Action Hub
+- **Tactile 3D White Dice:** Beautifully weighted, rounded white cubes with contrast pips, authentic tumble physics, and subtle resting tilt.
+- **Direct Action Pills:** Sleek, accessible action buttons (Roll, End Turn, Buy, Auction) positioned directly in the center hub.
+- **Center Activity Feed:** Real-time, legible ticker capturing rents paid, property deals, summons, and economic shifts.
+
+### 👥 Right-Side Player Cards & Status Dock
+- **Circular Player Avatars:** Distinct color-coded tokens, active turn indicators, and real-time cash balances.
+- **Deed Badges:** Immediate visual breakdown of owned districts, utilities, and railway lines.
+- **Universal Deed Inspector:** Tap any property cell on the board or in player cards to open the complete property deed sheet with full rent tiers and mortgage details.
+
+### 🌐 Peer-to-Peer Online Multiplayer
+- **Instant Rooms:** Create a private room or join via a 4-letter room code.
+- **Direct WebRTC P2P:** Zero-latency peer-to-peer gameplay powered by PeerJS.
+- **Live In-Game Chat:** Taunt opponents or negotiate deals in real time.
+
+### 🤝 Bilateral Visual Trade Desk
+- Select any player to propose custom trades: package deeds and cash sweeteners with instant bot or human evaluation.
+
+### 🔨 Split Live Auction Bidding Room
+- Properties passed by landing players trigger a live auction with AI tycoons or human peers. Real-time incremental bids (+LKR 250) until the hammer drops.
+
+### 🏆 Match Victory Podium & Career XP
+- **Post-Match Podium:** 1st, 2nd, 3rd, and 4th place ranking based on liquidated net worth.
+- **Timeline Graph:** Interactive canvas charting net worth progression round-by-round.
+- **Player Accolades:** Special awards (e.g. *Monopoly King*, *Rail Baron*, *Economy Survivor*).
+- **Career Leveling:** Persistent XP and Tycoon Rank saved across browser sessions.
+
+---
+
+## 🕹️ How to Play
+
+1. **Setup Match:** Enter your name, choose opponents (any mix of 4 distinct AI personalities or invite friends via online room), and pick your game duration.
+2. **Roll & Move:** Roll the pair of white dice. Rolling doubles gives you a bonus turn (beware: 3 consecutive doubles sends you to the Rest House!).
+3. **Acquire & Auction:** Land on unowned locations (Galle Face, Kandy Lake, Nuwara Eliya, etc.) to purchase them outright. Passing sends the deed to an open live auction.
+4. **Develop Districts:** Complete a color set to build houses and luxury hotels, dramatically multiplying rents.
+5. **Weather the Economy:** Adapt to 10-round inflation adjustments, district booms/busts, and Sri Lankan national event cards.
+6. **Victory:** Force your opponents into bankruptcy, or hold the highest net worth when the round limit expires!
+
+---
+
+## 📊 The Dynamic Economy Ruleset
+
+| System | Cadence | Economic Impact |
+|---|---|---|
+| **Inflation / Deflation** | Every 10 rounds | Compounding −3% to +12% shift on all board prices, rents, and building costs |
+| **District Booms & Busts** | Every 10 rounds | One random district surges (+15% price / +25% rent) while another declines (−15% / −20%) |
+| **National Event Cards** | On 📜 Squares | 20 unique Ceylon scenarios: Tourism surges, Colombo port expansion, fuel rations, tax amnesties |
+| **Government Regulations** | Every 20 rounds | Railway modernization subsidies, green energy tariffs, housing acts, and luxury levies |
+
+*(The **Classic** ruleset can be selected during setup for a traditional, pure-trading experience).*
+
+---
+
+## 🤖 The AI Personalities
+
+- 🔴 **The Aggressive Investor:** Hyper-expansionist. Bids up to 120% of market value, develops monopolies immediately, and refuses to sell.
+- 🔵 **The Conservative Banker:** Safety-first. Keeps large cash reserves, prioritizes utilities and railways, and avoids reckless debt.
+- 🟠 **The Risk Taker:** Speculative gambler. Buys every property it lands on and bids until cash runs out.
+- 🟢 **The Opportunistic Trader:** Market timer. Exploits district declines to snap up cheap deeds and halts construction during high inflation.
+
+---
+
+## 🛠️ Architecture & Tech Stack
+
+```
+pola/
+  ├── src/
+  │   ├── engine/          # Pure TypeScript deterministic game simulation
+  │   │   ├── types.ts     # Game state, player models, modifiers, actions
+  │   │   ├── config.ts    # Board layout (40 squares), rent tables, cards, personas
+  │   │   ├── rng.ts       # Seeded Mulberry32 RNG (reproducible replays & sync)
+  │   │   ├── economy.ts   # Dynamic modifier calculations (prices, rents, inflation)
+  │   │   ├── engine.ts    # Finite state machine (turns, auctions, debts, trades)
+  │   │   └── bots.ts      # AI persona heuristic decision engines
+  │   ├── net/             # WebRTC PeerJS multiplayer room & signaling
+  │   │   └── p2p.ts       # Host/client message dispatch & state sync
+  │   ├── ui/              # Reactive UI rendering & animations
+  │   │   ├── render.ts    # DOM generation, center hub, action pills, modals
+  │   │   ├── styles.css   # Sri Lankan Emerald & Gold design system
+  │   │   ├── dice.ts      # Tactile white dice tumble animations & audio triggers
+  │   │   ├── sfx.ts       # Synthesized procedural WebAudio sound engine
+  │   │   ├── trade.ts     # Visual trade desk modal
+  │   │   └── auction.ts   # Live auction bidding room
+  │   └── main.ts          # Application entrypoint & game loop
+  └── index.html           # Single-page shell
+```
+
+- **Zero-Dependency Engine:** Fully deterministic state machine with seeded RNG, making multiplayer synchronization and replays seamless.
+- **WebAudio Sound Engine:** Zero external audio assets. All sound effects (dice rolls, cash chimes, bankruptcy gongs) are procedurally synthesized in real time.
+
+---
+
+## 🚀 Getting Started
+
+### Local Development
 ```bash
 cd pola
 npm install
-npm run dev        # → http://localhost:5173
+npm run dev
 ```
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-Production build: `npm run build` (outputs to `dist/`, deploy anywhere static).
-
-Headless engine check (4 bots, 5 seeds, no browser):
-
+### Headless Engine Verification
+Test the simulation engine across automated AI matches:
 ```bash
 npx esbuild scripts/sim.ts --bundle --platform=node --outfile=scripts/sim.cjs
 node scripts/sim.cjs
 ```
 
-## How to play
-
-1. **Setup** — enter your name, pick opponents (any mix of the four bots),
-   choose a ruleset and game length.
-2. **Roll** — two dice, move clockwise. Doubles grant a bonus roll; three
-   doubles in a row earns a court summons.
-3. **Buy or pass** — unowned squares you land on can be bought at the listed
-   price, or passed to a **live auction** (opening bid 50% of market value,
-   LKR 250 increments — you bid against the bots).
-4. **Build** — own every square of a colour group to build houses (evenly,
-   max 4) and then a hotel. Rents scale 1× → 2× → 3× → 5× → 7× → 10×.
-5. **Survive** — pass Start for LKR 2,000, pay Income Tax, dodge the Court
-   Summons. Cash short? The game auto-liquidates your buildings (half price)
-   and mortgages properties before declaring bankruptcy.
-6. **Win** — last player solvent, or highest net worth when the round limit
-   hits. Net worth = cash + properties + buildings (market-adjusted).
-
-## The Economy ruleset
-
-| System | Cadence | Effect |
-|---|---|---|
-| Inflation / deflation | every 10 rounds | −3% … +12%, **compounds** into every price, rent, and cost |
-| Market boom / decline | every 10 rounds | one random district +15% price / +25% rent, another −15% / −20%, for 10 rounds |
-| National Event cards | landing on 📜 | 20-card deck: tourism hype, fuel shortages, floods, tax amnesties, disasters… |
-| Government regulations | every 20 rounds | railway modernisation, electricity tariffs, housing subsidies, tax hikes |
-
-The **Classic** ruleset disables all four for pure property trading — use it
-to teach new players, and as the balance baseline.
-
-## The four bots
-
-| Bot | Style | Tells |
-|---|---|---|
-| 🔴 The Aggressive Investor | Expansion | bids to 120% of market, builds the moment a monopoly lands, hates selling |
-| 🔵 The Conservative Banker | Safety | only spends half its cash, loves railways & utilities, huge reserves |
-| 🟠 The Risk Taker | Speculation | buys everything it can afford, bids till cash runs out |
-| 🟢 The Opportunistic Trader | Market timing | hunts discounts during declines, pauses construction during inflation |
-
-Bots call the exact same engine functions the human UI does — one rules path,
-no cheating.
-
-## Architecture
-
-```
-src/
-  engine/          ← pure TypeScript, zero DOM, deterministic
-    types.ts       GameState, phases, modifiers
-    config.ts      board (40 squares), groups, rent tables, cards, personas
-    rng.ts         seeded mulberry32 — every match replays from its seed
-    economy.ts     modifier system + all value getters (price/rent/net worth)
-    engine.ts      turn state machine: roll, land, buy, auction, build, jail,
-                   debt liquidation, bankruptcy, round ticks
-    bots.ts        persona decision functions (buy / bid / build / jail)
-  ui/
-    render.ts      DOM renderer + setup screen, card popup, game-over dialog
-    styles.css     dark board theme
-  main.ts          driver: human actions from UI, bot actions on a timer
-scripts/sim.ts     headless full-game verification (terminates, winner, sane)
+### Production Build & Deploy
+```bash
+npm run build      # Builds to dist/
+npm run deploy     # Deploys dist/ to GitHub Pages
 ```
 
-**Design decisions worth knowing**
+---
 
-- *Deterministic core.* All randomness flows through `GameState.rngState`
-  (mulberry32). Same seed → identical match. This is the foundation for
-  replays, spectating, server-authoritative multiplayer, and anti-cheat later.
-- *Juice is a layer, not a rule change.* 3D dice (CSS cubes), token hop
-  animations, WebAudio sound effects, money floaters, landing pulses and the
-  win confetti all live in `src/ui/` (`dice.ts`, `fx.ts`) and are driven by
-  the same `perform()` pipeline in `main.ts` — the engine stays pure and
-  synchronous. Fast mode (⚡) and mute (🔊) persist in localStorage.
-- *Modifiers as data.* Booms, cards, and regulations all compile to one
-  `Modifier` list (`target × stat × multiplier × rounds`). Adding an effect
-  never means touching the rent function.
-- *Spec stays the source of truth.* Board layout, group prices, rent
-  multipliers, auction and jail rules follow the original MONOPOLY-LK spec;
-  the two deliberate deviations are documented in `config.ts`:
-  company names are fictionalised (trademark safety) and utility rent is
-  scaled ×25 so "4× dice" lands on the same LKR scale as everything else.
+## 🗺️ Roadmap & Milestones
 
-## Roadmap
+- [x] **Phase 1: Foundation & Economy Engine** — Deterministic 40-tile Sri Lankan board, 4 bot personas, and dynamic macro-economy.
+- [x] **Phase 2: Minimalist UI Overhaul** — Tactile white dice, center action pills, right-side player cards, and Sri Lankan Emerald & Gold palette.
+- [x] **Phase 3: Multiplayer & Interaction** — P2P WebRTC online rooms, live auction hall, and visual trade desk.
+- [x] **Phase 4: Analytics & Victory** — Interactive net-worth timeline chart, podium accolades, and persistent career XP.
+- [ ] **Phase 5: Bank of Serendib** — Mortgages, loans, and property insurance policies.
+- [ ] **Phase 6: Native Mobile & Localisation** — Sinhala / Tamil localization and Capacitor mobile wrappers.
 
-- [x] **Phase 1** — playable web prototype: 1 human + bots, Economy ruleset
-- [ ] Loans & insurance (the Bank of Serendib and the two insurers are already
-      on the board; the spec's Rule-LK 1–11 defines them)
-- [ ] Online multiplayer rooms (Colyseus, server-authoritative, seeded RNG)
-- [ ] Async turns with notifications — the diaspora feature
-- [ ] Sinhala / Tamil localisation, mobile wrappers (Capacitor)
-- [ ] Cosmetics: tokens (tuk-tuk, elephant, cricket bat), themed boards
+---
+
+*Developed with ❤️ for Sri Lanka.*

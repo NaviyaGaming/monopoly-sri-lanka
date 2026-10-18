@@ -73,21 +73,10 @@ export function setTimerDisplay(seconds: number, urgent: boolean, visible: boole
   currentTimerVisible = visible;
   const badge = document.getElementById('turn-timer-badge');
   const val = document.getElementById('turn-timer-val');
-  const track = document.getElementById('turn-progress-track');
-  const fill = document.getElementById('turn-progress-fill');
   if (badge && val) {
     badge.style.display = visible ? 'inline-flex' : 'none';
     val.textContent = `${seconds}s`;
     badge.classList.toggle('urgent', urgent);
-  }
-  if (track && fill) {
-    track.style.display = visible ? 'block' : 'none';
-    const pct = Math.max(0, Math.min(100, (seconds / 30) * 100));
-    fill.style.width = `${pct}%`;
-    fill.classList.toggle('urgent', urgent);
-  }
-  if (urgent && visible && seconds <= 5 && seconds > 0) {
-    sfx('tick');
   }
 }
 
@@ -263,9 +252,6 @@ function renderBoard(s: GameState, h: Handlers): void {
       <div id="turn-timer-badge" class="turn-timer-badge" style="display: ${currentTimerVisible ? 'inline-flex' : 'none'};">
         <span class="timer-icon">⏱️</span>
         <span id="turn-timer-val">${currentTimerVal}s</span>
-      </div>
-      <div class="turn-progress-track" id="turn-progress-track" style="display: ${currentTimerVisible ? 'block' : 'none'};">
-        <div class="turn-progress-fill${currentTimerUrgent ? ' urgent' : ''}" id="turn-progress-fill" style="width: ${Math.max(0, Math.min(100, (currentTimerVal / 30) * 100))}%;"></div>
       </div>
       <div class="dice-row" id="dice-holder"></div>
       <div class="hub-actions" id="hub-actions"></div>
