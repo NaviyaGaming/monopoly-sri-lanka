@@ -2,7 +2,7 @@
 // Full DOM re-render from GameState after every action. Emerald/gold island
 // theme, 3D pedestal tokens, contextual center-hub cards, tabbed desk.
 
-import type { GameState, GroupId } from '../engine/types';
+import type { GameState, GroupId, Player } from '../engine/types';
 import {
   BOARD, COMMUNITY_CARDS, GROUPS, HEADLINE_CARDS, PERSONAS, TOKENS,
 } from '../engine/config';
@@ -121,14 +121,25 @@ function gridPos(i: number): { row: number; col: number } {
 
 // ─── Full render ──────────────────────────────────────────────────────────
 
+let lastRenderedState: GameState | null = null;
+let lastRenderedHandlers: Handlers | null = null;
+
 export function render(s: GameState, h: Handlers, myId?: number | null): void {
   if (myId !== undefined) localPlayerId = myId;
+  lastRenderedState = s;
+  lastRenderedHandlers = h;
   renderHeader(s);
   renderBoard(s, h);
   renderScoreboard(s, h);
   renderTabs(s, h);
   renderOverlay(s, h);
 }
+
+window.addEventListener('resize', () => {
+  if (lastRenderedState && lastRenderedHandlers) {
+    updateMobileActionDock(lastRenderedState, lastRenderedHandlers);
+  }
+});
 
 // ─── Header ───────────────────────────────────────────────────────────────
 
@@ -194,7 +205,11 @@ function renderBoard(s: GameState, h: Handlers): void {
     // Top color bar with build/shield/damage/mortgage icons.
     let topBar = '';
     if (def.group && def.kind === 'property') {
-      const buildIcons = st.buildings === 5 ? '🏨' : st.buildings > 0 ? '🏠'.repeat(st.buildings) : '';
+      const buildIcons = st.buildings === 5
+        ? '<span class="mini-hotel-3d" title="Luxury Boutique Hotel">🏨</span>'
+        : st.buildings > 0
+          ? `<span class="mini-houses-3d" title="${st.buildings} Houses">${'🏠'.repeat(st.buildings)}</span>`
+          : '';
       const shieldIcon = st.shield === 3 ? '👑' : st.shield === 2 ? '🔰' : st.shield === 1 ? '🛡️' : '';
       const statusIcons = `${shieldIcon}${st.damaged ? '⚠️' : ''}${st.mortgaged ? '🔒' : ''}`;
       topBar = `<div class="cell-bar" style="background:${GROUPS[def.group].color}"><span>${buildIcons}</span><span>${statusIcons}</span></div>`;
@@ -224,6 +239,9 @@ function renderBoard(s: GameState, h: Handlers): void {
       activeTab = 'deed';
       render(s, h);
       h.onSelectSquare(i);
+      if (window.innerWidth <= 900) {
+        openMobileTileSheet(s, i, h);
+      }
     });
     grid.appendChild(cell);
   }
@@ -388,6 +406,258 @@ function renderHubCard(s: GameState, h: Handlers): void {
       break;
     }
   }
+
+  const hint = computeSmartHint(s, p, isMyTurn);
+  if (hint && card) {
+    const hintDiv = document.createElement('div');
+    hintDiv.className = 'smart-assistant-hint';
+    hintDiv.innerHTML = `<span class="hint-pulse"></span><span>${hint}</span>`;
+    card.prepend(hintDiv);
+  }
+
+  updateMobileActionDock(s, h);
+}
+
+function computeSmartHint(s: GameState, p: Player, isMyTurn: boolean): string | null {
+  if (!isMyTurn || p.bankrupt) return null;
+  if (s.phase === 'preRoll') {
+    if (p.inJail) return '⚖️ CID Inquiry: Roll doubles to escape free, or pay LKR 500 bail.';
+    return null;
+  }
+  if (s.phase === 'decideBuy') {
+    const bi = s.pendingBuy;
+    if (bi !== null && bi !== undefined) {
+      const def = BOARD[bi];
+      const price = squareValue(s, bi);
+      if (p.cash >= price) {
+        if (def.group && ownsMonopoly(s, p.id, def.group)) {
+          return `🌟 Buying this completes your ${GROUPS[def.group].name} Monopoly!`;
+        }
+        return `💡 Tip: Buying ${def.name} builds passive income whenever others land on it.`;
+      } else {
+        return `⚠️ Insufficient cash to buy at list price. Passing will start an auction.`;
+      }
+    }
+  }
+  if (s.phase === 'postRoll') {
+    if (s.hasBonusRoll) return '🎲 Doubles bonus! You rolled doubles — roll again!';
+    // Check if player has complete monopoly and can build
+    for (let i = 0; i < s.squares.length; i++) {
+      const st = s.squares[i];
+      if (st.owner === p.id) {
+        const def = BOARD[i];
+        if (def.group && ownsMonopoly(s, p.id, def.group) && st.buildings < 5 && p.cash >= buildCostOf(s, i)) {
+          return `💡 You hold the ${GROUPS[def.group].name} monopoly! Tap Deed tab to build houses.`;
+        }
+      }
+    }
+    // Check if player has damaged property
+    for (let i = 0; i < s.squares.length; i++) {
+      const st = s.squares[i];
+      if (st.owner === p.id && st.damaged && p.cash >= 800) {
+        return `⚠️ ${BOARD[i].name} is storm-damaged! Repair for LKR 800 to restore rent.`;
+      }
+    }
+    // Check if player has unshielded expensive property
+    for (let i = 0; i < s.squares.length; i++) {
+      const st = s.squares[i];
+      if (st.owner === p.id && st.shield === 0 && (BOARD[i].price ?? 0) >= 2000 && p.cash >= 1000) {
+        return `🛡️ Tip: Shield ${BOARD[i].name} in Shield tab before disaster strikes!`;
+      }
+    }
+  }
+  return null;
+}
+
+function updateMobileActionDock(s: GameState, h: Handlers): void {
+  const dock = document.getElementById('mobile-action-dock');
+  if (!dock) return;
+
+  const isGameView = !document.getElementById('layout')?.classList.contains('hidden');
+  if (!isGameView || s.phase === 'gameOver' || window.innerWidth > 900) {
+    dock.classList.add('hidden');
+    dock.innerHTML = '';
+    return;
+  }
+
+  dock.classList.remove('hidden');
+
+  if (s.cardJustDrawn) {
+    dock.innerHTML = `
+      <button class="btn btn-dock primary hero" id="dock-btn-card-ok">✨ Collect & Continue ➜</button>
+    `;
+    document.getElementById('dock-btn-card-ok')?.addEventListener('click', h.onCardOk);
+    return;
+  }
+
+  const p = cur(s);
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
+
+  if (!isMyTurn) {
+    dock.innerHTML = `
+      <div class="dock-waiting-pill"><span class="pulse-dot"></span> ⏳ Waiting for <b>${p.name}</b>...</div>
+    `;
+    return;
+  }
+
+  switch (s.phase) {
+    case 'preRoll': {
+      if (p.inJail) {
+        dock.innerHTML = `
+          <button class="btn btn-dock primary hero" id="dock-btn-roll">🎲 ROLL DICE</button>
+          <button class="btn btn-dock amber" id="dock-btn-bail" ${p.cash < 500 ? 'disabled' : ''}>⚖️ PAY BAIL</button>
+        `;
+        document.getElementById('dock-btn-roll')?.addEventListener('click', h.onRoll);
+        document.getElementById('dock-btn-bail')?.addEventListener('click', h.onBail);
+      } else {
+        dock.innerHTML = `
+          <button class="btn btn-dock primary hero" id="dock-btn-roll">🎲 ROLL DICE</button>
+        `;
+        document.getElementById('dock-btn-roll')?.addEventListener('click', h.onRoll);
+      }
+      break;
+    }
+    case 'decideBuy': {
+      const bi = s.pendingBuy!;
+      const price = squareValue(s, bi);
+      const afford = p.cash >= price;
+      dock.innerHTML = `
+        <button class="btn btn-dock primary hero" id="dock-btn-buy" ${afford ? '' : 'disabled'}>🏠 BUY · LKR ${fmt(price)}</button>
+        <button class="btn btn-dock danger" id="dock-btn-pass">🔨 AUCTION</button>
+      `;
+      document.getElementById('dock-btn-buy')?.addEventListener('click', h.onBuy);
+      document.getElementById('dock-btn-pass')?.addEventListener('click', h.onPass);
+      break;
+    }
+    case 'postRoll': {
+      const endBtnText = s.hasBonusRoll ? '🎲 ROLL AGAIN (Doubles!)' : '➜ END TURN';
+      dock.innerHTML = `
+        <button class="btn btn-dock primary${s.hasBonusRoll ? ' gold' : ''} hero" id="dock-btn-end">${endBtnText}</button>
+      `;
+      document.getElementById('dock-btn-end')?.addEventListener('click', h.onEndTurn);
+      break;
+    }
+    case 'auction': {
+      const currentBidder = auctionCurrentBidder(s);
+      if (currentBidder === localPlayerId) {
+        dock.innerHTML = `
+          <button class="btn btn-dock primary hero" id="dock-btn-bid">💰 BID +LKR 200</button>
+          <button class="btn btn-dock danger" id="dock-btn-withdraw">✕ PASS</button>
+        `;
+        document.getElementById('dock-btn-bid')?.addEventListener('click', () => h.onBid(200));
+        document.getElementById('dock-btn-withdraw')?.addEventListener('click', h.onWithdraw);
+      } else {
+        dock.innerHTML = `<div class="dock-waiting-pill"><span class="pulse-dot"></span> 🔨 Auction in progress...</div>`;
+      }
+      break;
+    }
+    default:
+      dock.classList.add('hidden');
+      dock.innerHTML = '';
+      break;
+  }
+}
+
+export function openMobileTileSheet(s: GameState, idx: number, h: Handlers): void {
+  const sheet = document.getElementById('mobile-tile-sheet');
+  const body = document.getElementById('sheet-body-content');
+  const scrim = document.getElementById('sheet-scrim');
+  if (!sheet || !body) return;
+
+  const def = BOARD[idx];
+  const st = s.squares[idx];
+  const owner = st.owner !== null ? s.players[st.owner] : null;
+  const isMe = localPlayerId !== null && st.owner === localPlayerId;
+  const gcolor = def.group ? GROUPS[def.group].color : '#64748b';
+  const val = squareValue(s, idx);
+  const isProp = def.kind === 'property';
+
+  let rentRows = '';
+  if (def.rents) {
+    rentRows = `
+      <div class="sheet-rent-table">
+        <div class="sheet-rent-row ${st.buildings === 0 ? 'active' : ''}"><span>Base Rent</span><span>LKR ${fmt(def.rents[0])}</span></div>
+        <div class="sheet-rent-row ${st.buildings === 1 ? 'active' : ''}"><span>1 House 🏠</span><span>LKR ${fmt(def.rents[1])}</span></div>
+        <div class="sheet-rent-row ${st.buildings === 2 ? 'active' : ''}"><span>2 Houses 🏠🏠</span><span>LKR ${fmt(def.rents[2])}</span></div>
+        <div class="sheet-rent-row ${st.buildings === 3 ? 'active' : ''}"><span>3 Houses 🏠🏠🏠</span><span>LKR ${fmt(def.rents[3])}</span></div>
+        <div class="sheet-rent-row ${st.buildings === 4 ? 'active' : ''}"><span>4 Houses 🏠🏠🏠🏠</span><span>LKR ${fmt(def.rents[4])}</span></div>
+        <div class="sheet-rent-row ${st.buildings === 5 ? 'active' : ''}"><span>Boutique Hotel 🏨</span><span>LKR ${fmt(def.rents[5])}</span></div>
+      </div>`;
+  }
+
+  const perkText = def.group ? GROUPS[def.group].perk : (def.desc || '');
+  const perkSection = perkText ? `<div class="sheet-perk-box">🌟 <b>District Perk:</b> ${perkText}</div>` : '';
+
+  let actionsHtml = '';
+  if (isMe) {
+    const curP = s.players[localPlayerId!];
+    const canBuild = isProp && def.group && ownsMonopoly(s, curP.id, def.group) && st.buildings < 5 && !st.mortgaged && !st.damaged && curP.cash >= buildCostOf(s, idx);
+    const canRepair = st.damaged && curP.cash >= 800;
+    const canShield = isProp && st.shield < 3 && !st.mortgaged;
+
+    actionsHtml = `
+      <div class="sheet-action-buttons">
+        ${canBuild ? `<button class="btn small primary" id="sheet-btn-build">🏗️ Build House (LKR ${fmt(buildCostOf(s, idx))})</button>` : ''}
+        ${canRepair ? `<button class="btn small gold" id="sheet-btn-repair">🔧 Repair (LKR 800)</button>` : ''}
+        ${canShield ? `<button class="btn small sky" id="sheet-btn-shield">🛡️ Add Shield</button>` : ''}
+      </div>`;
+  }
+
+  body.innerHTML = `
+    <div class="sheet-card-header" style="background:${gcolor}">
+      <div class="sheet-card-title">
+        <span class="sheet-icon">${def.icon || '🏠'}</span>
+        <div>
+          <h4>${squareName(idx, false, def.name, def.short)}</h4>
+          <span class="sheet-sub">${def.group ? GROUPS[def.group].name : def.kind.toUpperCase()}</span>
+        </div>
+      </div>
+      <button class="sheet-close-x" id="sheet-btn-close">✕</button>
+    </div>
+
+    <div class="sheet-card-body">
+      <div class="sheet-meta-grid">
+        <div class="sheet-meta-pill">
+          <span class="label">Status</span>
+          <span class="val">${owner ? `<b style="color:${owner.color}">${owner.name}</b>` : '<b class="green">For Sale</b>'}</span>
+        </div>
+        <div class="sheet-meta-pill">
+          <span class="label">Current Value</span>
+          <span class="val">LKR ${fmt(val)}</span>
+        </div>
+        <div class="sheet-meta-pill">
+          <span class="label">Protection</span>
+          <span class="val">${st.shield > 0 ? `Level ${st.shield} 🛡️` : 'None'}</span>
+        </div>
+      </div>
+
+      ${rentRows}
+      ${perkSection}
+      ${actionsHtml}
+    </div>
+  `;
+
+  sheet.classList.remove('hidden');
+
+  document.getElementById('sheet-btn-close')?.addEventListener('click', () => {
+    sheet.classList.add('hidden');
+  });
+  if (scrim) {
+    scrim.onclick = () => sheet.classList.add('hidden');
+  }
+
+  document.getElementById('sheet-btn-build')?.addEventListener('click', () => {
+    h.onBuild(idx);
+    sheet.classList.add('hidden');
+  });
+  document.getElementById('sheet-btn-repair')?.addEventListener('click', () => {
+    h.onRepair(idx);
+    sheet.classList.add('hidden');
+  });
+  document.getElementById('sheet-btn-shield')?.addEventListener('click', () => {
+    h.onShield(idx, 1);
+    sheet.classList.add('hidden');
+  });
 }
 
 function cardPopupHtml(s: GameState, isMyTurn = true): string {

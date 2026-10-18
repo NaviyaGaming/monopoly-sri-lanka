@@ -9,6 +9,7 @@ import {
   payBail, repairSquare, repayLoan, sellBuilding, takeLoan, takeTurnRoll,
   unmortgageSquare, validTrade,
 } from './engine/engine';
+import { squareValue } from './engine/economy';
 import { botAct, botConsiderTrade, botToAct } from './engine/bots';
 import { render, renderCareerModal, setActiveTab, markLanded, setDiceClickHandler, setLocalPlayerId, setTimerDisplay, type Handlers } from './ui/render';
 import { renderDice } from './ui/dice';
@@ -289,24 +290,28 @@ function handleTurnTimeout(): void {
 
 // ─── Client Action Delegation (WebRTC sync) ───────────────────────────────
 
+let executingRemoteAction = false;
+
 function actionOrSend(fnName: string, localFn: () => void, ...args: any[]): void {
   if (!S) return;
 
   // Turn authorization: prevent players from controlling someone else's turn/dices!
-  if (S.phase === 'auction') {
-    const currentBidder = auctionCurrentBidder(S);
-    if (currentBidder !== myPlayerId) {
-      toast('⏳ Please wait for your turn to bid!', 'amber');
-      return;
-    }
-  } else if (fnName === 'onTradeAccept' || fnName === 'onTradeDecline') {
-    if (S.pendingTrade?.toId !== myPlayerId) {
-      return;
-    }
-  } else {
-    if (S.current !== myPlayerId) {
-      toast('⏳ Not your turn to roll or act!', 'amber');
-      return;
+  if (!executingRemoteAction) {
+    if (S.phase === 'auction') {
+      const currentBidder = auctionCurrentBidder(S);
+      if (currentBidder !== myPlayerId) {
+        toast('⏳ Please wait for your turn to bid!', 'amber');
+        return;
+      }
+    } else if (fnName === 'onTradeAccept' || fnName === 'onTradeDecline') {
+      if (S.pendingTrade?.toId !== myPlayerId) {
+        return;
+      }
+    } else {
+      if (S.current !== myPlayerId) {
+        toast('⏳ Not your turn to roll or act!', 'amber');
+        return;
+      }
     }
   }
 
@@ -665,7 +670,14 @@ async function handleCreateRoom(): Promise<void> {
             }
           }
           const actionFn = (handlers as any)[msg.fnName];
-          if (typeof actionFn === 'function') actionFn(...msg.args);
+          if (typeof actionFn === 'function') {
+            executingRemoteAction = true;
+            try {
+              actionFn(...msg.args);
+            } finally {
+              executingRemoteAction = false;
+            }
+          }
         } else if (msg.type === 'lobby_chat') {
           appendLobbyChat(msg.sender, msg.text);
           broadcastMessage(msg);
@@ -996,6 +1008,99 @@ document.getElementById('home-btn-start-solo')?.addEventListener('click', () => 
   resetTurnTimer();
   scheduleBot();
   toast('🎲 Solo match vs AI started!', 'emerald');
+});
+
+document.getElementById('home-btn-quick-play')?.addEventListener('click', () => {
+  ensureAudio();
+  sfx('click');
+
+  const hostName = (document.getElementById('home-host-name') as HTMLInputElement)?.value.trim() || 'Navindu';
+  const botNames = ['Sunil (Tuk Tycoon)', 'Anura (Tea Planter)', 'Kamal (Harbor Mogul)'];
+  const tokenKeys: TokenKey[] = ['elephant', 'train', 'gem'];
+
+  myPlayerId = 0;
+  setLocalPlayerId(0);
+
+  const players: PlayerSetup[] = [
+    { name: hostName, kind: 'human', persona: 'opportunist', tokenKey: myTokenKey },
+    { name: botNames[0], kind: 'bot', persona: 'aggressive', tokenKey: tokenKeys[0] },
+    { name: botNames[1], kind: 'bot', persona: 'conservative', tokenKey: tokenKeys[1] },
+    { name: botNames[2], kind: 'bot', persona: 'opportunist', tokenKey: tokenKeys[2] },
+  ];
+
+  S = createGame({
+    players,
+    seed: (Date.now() % 2147483647) | 0,
+    maxRounds: 25,
+    startingCash: 30000,
+  });
+
+  showView('game');
+  render(S, handlers, myPlayerId);
+  resetTurnTimer();
+  scheduleBot();
+  toast('⚡ Instant Match Started! Have fun!', 'emerald');
+});
+
+// ─── Keyboard Shortcuts (Space / Enter / Escape) ──────────────────────────
+
+window.addEventListener('keydown', (e) => {
+  const activeEl = document.activeElement;
+  if (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || activeEl instanceof HTMLSelectElement) {
+    return;
+  }
+
+  if (e.code === 'Escape') {
+    document.getElementById('modal-rules')?.classList.add('hidden');
+    document.getElementById('modal-career')?.classList.add('hidden');
+    document.getElementById('mobile-tile-sheet')?.classList.add('hidden');
+    return;
+  }
+
+  if (e.code === 'Space' || e.code === 'Enter') {
+    if (!S || S.phase === 'gameOver') return;
+
+    // 1. If card popup is active
+    if (S.cardJustDrawn) {
+      e.preventDefault();
+      handlers.onCardOk();
+      return;
+    }
+
+    const isMyTurn = S.current === myPlayerId;
+
+    // 2. If auction is active
+    if (S.phase === 'auction') {
+      const currentBidder = auctionCurrentBidder(S);
+      if (currentBidder === myPlayerId) {
+        e.preventDefault();
+        handlers.onBid(200);
+      }
+      return;
+    }
+
+    if (!isMyTurn) return;
+
+    if (S.phase === 'preRoll') {
+      e.preventDefault();
+      handlers.onRoll();
+    } else if (S.phase === 'decideBuy') {
+      e.preventDefault();
+      const curP = S.players[S.current];
+      const bi = S.pendingBuy;
+      if (bi !== null && bi !== undefined) {
+        const cost = squareValue(S, bi);
+        if (curP.cash >= cost) {
+          handlers.onBuy();
+        } else {
+          handlers.onPass();
+        }
+      }
+    } else if (S.phase === 'postRoll') {
+      e.preventDefault();
+      handlers.onEndTurn();
+    }
+  }
 });
 
 // ─── Rules Modal Controller ───────────────────────────────────────────────

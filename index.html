@@ -53,6 +53,12 @@
       <h1 class="home-title">POLA · MONOPOLY LK</h1>
       <p class="home-subtitle">The rich, strategic Sri Lankan property trading empire. Play with friends online or solo vs AI bots!</p>
 
+      <div class="home-quick-play-bar">
+        <button class="btn gold btn-quick-play" id="home-btn-quick-play">
+          ⚡ Instant Quick Play (1-Tap Solo vs AI)
+        </button>
+      </div>
+
       <div class="home-cards-grid">
         <!-- Card 1: Create Online Room -->
         <div class="home-card card-create">
@@ -292,6 +298,18 @@
       </section>
     </aside>
   </main>
+
+  <!-- ─── MOBILE FLOATING ACTION DOCK (Thumb-Friendly Controls) ─ -->
+  <div id="mobile-action-dock" class="mobile-action-dock hidden"></div>
+
+  <!-- ─── MOBILE ONE-TAP TILE INSPECTION BOTTOM SHEET ────────── -->
+  <div id="mobile-tile-sheet" class="mobile-tile-sheet hidden">
+    <div class="sheet-scrim" id="sheet-scrim"></div>
+    <div class="sheet-container" id="sheet-container">
+      <div class="sheet-drag-handle"></div>
+      <div id="sheet-body-content"></div>
+    </div>
+  </div>
 
   <div id="overlay" class="hidden"></div>
   <div id="toast-container"></div>
