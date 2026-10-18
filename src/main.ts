@@ -4,13 +4,13 @@ import './ui/styles.css';
 import type { GameState, LogEntry, PlayerSetup, TokenKey } from './engine/types';
 import { PERSONAS, SEAT_COLORS, TOKENS } from './engine/config';
 import {
-  applyTrade, auctionBid, auctionPass, buyCurrent, buyShield, createGame,
+  applyTrade, auctionBid, auctionCurrentBidder, auctionPass, buyCurrent, buyShield, createGame,
   declineCurrent, doBuild, endTurn, expressTransit, maintainSquare, mortgageSquare,
   payBail, repairSquare, repayLoan, sellBuilding, takeLoan, takeTurnRoll,
   unmortgageSquare, validTrade,
 } from './engine/engine';
 import { botAct, botConsiderTrade, botToAct } from './engine/bots';
-import { render, setActiveTab, markLanded, setDiceClickHandler, type Handlers } from './ui/render';
+import { render, setActiveTab, markLanded, setDiceClickHandler, setLocalPlayerId, type Handlers } from './ui/render';
 import { renderDice } from './ui/dice';
 import { TOKEN_AVATARS } from './ui/tokens';
 import { ensureAudio, floatCash, isMuted, popup, sfx, toast, toggleMute, tokenSfx } from './ui/fx';
@@ -25,6 +25,7 @@ let S: GameState | null = null;
 let busy = false;
 let fastMode = localStorage.getItem('st-fast') === '1';
 const BOT_STEP_MS = 650;
+let myPlayerId = 0;
 
 // ─── View Routing (Home | Lobby | Game) ────────────────────────────────────
 
@@ -104,7 +105,7 @@ async function perform(fn: (s: GameState) => void): Promise<void> {
       if (d !== 0) floatCash(i, d);
     });
 
-    render(s, handlers);
+    render(s, handlers, myPlayerId);
 
     if (isOnlineHost()) {
       broadcastMessage({ type: 'state', state: s });
@@ -197,8 +198,28 @@ function scheduleBot(): void {
 // ─── Client Action Delegation (WebRTC sync) ───────────────────────────────
 
 function actionOrSend(fnName: string, localFn: () => void, ...args: any[]): void {
+  if (!S) return;
+
+  // Turn authorization: prevent players from controlling someone else's turn/dices!
+  if (S.phase === 'auction') {
+    const currentBidder = auctionCurrentBidder(S);
+    if (currentBidder !== myPlayerId) {
+      toast('⏳ Please wait for your turn to bid!', 'amber');
+      return;
+    }
+  } else if (fnName === 'onTradeAccept' || fnName === 'onTradeDecline') {
+    if (S.pendingTrade?.toId !== myPlayerId) {
+      return;
+    }
+  } else {
+    if (S.current !== myPlayerId) {
+      toast('⏳ Not your turn to roll or act!', 'amber');
+      return;
+    }
+  }
+
   if (isOnlineClient()) {
-    sendToHost({ type: 'action', fnName, args });
+    sendToHost({ type: 'action', fnName, args, playerId: myPlayerId });
   } else {
     localFn();
   }
@@ -275,7 +296,11 @@ const handlers: Handlers = {
 
 setDiceClickHandler(() => {
   if (S && S.phase === 'preRoll' && S.players[S.current].kind === 'human' && !busy) {
-    handlers.onRoll();
+    if (S.current === myPlayerId) {
+      handlers.onRoll();
+    } else {
+      toast('⏳ Wait for your turn to roll the dice!', 'amber');
+    }
   }
 });
 
@@ -302,7 +327,7 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('#topbar .lang-to
       b.classList.toggle('active', b === btn);
     }
     refreshHeader();
-    if (S) render(S, handlers);
+    if (S) render(S, handlers, myPlayerId);
   });
 }
 document.getElementById('btn-mute')!.addEventListener('click', () => { toggleMute(); refreshHeader(); });
@@ -311,7 +336,7 @@ document.addEventListener('pointerdown', ensureAudio);
 for (const btn of document.querySelectorAll<HTMLButtonElement>('.tab-trigger')) {
   btn.addEventListener('click', () => {
     setActiveTab(btn.id.replace('tab-btn-', ''));
-    if (S) render(S, handlers);
+    if (S) render(S, handlers, myPlayerId);
   });
 }
 
@@ -507,6 +532,7 @@ async function handleCreateRoom(): Promise<void> {
           isHost: false,
           isBot: false,
         });
+        conn.send({ type: 'welcome', playerId: newPlayerId, state: S });
         appendLobbyChat('System', `${data.name} joined the lobby.`, true);
         broadcastLobbyUpdate();
         updateLobbyUI();
@@ -514,6 +540,16 @@ async function handleCreateRoom(): Promise<void> {
       // onMessage
       (msg) => {
         if (msg.type === 'action' && S) {
+          const senderId = msg.playerId;
+          if (typeof senderId === 'number') {
+            if (S.phase === 'auction') {
+              if (auctionCurrentBidder(S) !== senderId) return;
+            } else if (msg.fnName === 'onTradeAccept' || msg.fnName === 'onTradeDecline') {
+              if (S.pendingTrade?.toId !== senderId) return;
+            } else {
+              if (S.current !== senderId) return;
+            }
+          }
           const actionFn = (handlers as any)[msg.fnName];
           if (typeof actionFn === 'function') actionFn(...msg.args);
         } else if (msg.type === 'lobby_chat') {
@@ -534,6 +570,9 @@ async function handleCreateRoom(): Promise<void> {
         toast('A player disconnected from lobby', 'rose');
       }
     );
+
+    myPlayerId = 0;
+    setLocalPlayerId(0);
 
     currentLobbyPlayers = [{
       id: 0,
@@ -597,19 +636,31 @@ async function handleJoinRoom(): Promise<void> {
       playerName,
       myTokenKey,
       (msg) => {
-        if (msg.type === 'lobby_update') {
+        if (msg.type === 'welcome') {
+          myPlayerId = msg.playerId;
+          setLocalPlayerId(msg.playerId);
+          if (msg.state) {
+            S = msg.state;
+            render(S, handlers, myPlayerId);
+          }
+        } else if (msg.type === 'lobby_update') {
           currentLobbyPlayers = msg.players;
           currentLobbySettings = msg.settings;
+          const me = msg.players.find(p => p.name === myPlayerName);
+          if (me && typeof me.id === 'number') {
+            myPlayerId = me.id;
+            setLocalPlayerId(me.id);
+          }
           updateLobbyUI();
         } else if (msg.type === 'start_game') {
           sfx('fanfare');
           toast('Match started by host!', 'emerald');
           S = msg.state;
           showView('game');
-          render(S, handlers);
+          render(S, handlers, myPlayerId);
         } else if (msg.type === 'state') {
           S = msg.state;
-          render(S, handlers);
+          render(S, handlers, myPlayerId);
         } else if (msg.type === 'lobby_chat') {
           appendLobbyChat(msg.sender, msg.text);
         } else if (msg.type === 'chat') {
@@ -697,7 +748,7 @@ document.getElementById('lobby-btn-start-game')?.addEventListener('click', () =>
 
   broadcastMessage({ type: 'start_game', state: S });
   showView('game');
-  render(S, handlers);
+  render(S, handlers, myPlayerId);
   scheduleBot();
   toast('🎮 Match launched! May the best tycoon win!', 'emerald');
 });
@@ -793,6 +844,9 @@ document.getElementById('home-btn-start-solo')?.addEventListener('click', () => 
   const botNames = ['Sunil (Tuk Tycoon)', 'Anura (Tea Planter)', 'Kamal (Harbor Mogul)', 'Nimal (Gem Baron)', 'Priyani (Kandy Dancer)', 'Rohan (Train King)'];
   const tokenKeys: TokenKey[] = ['elephant', 'dancer', 'train', 'gem', 'ship', 'tuktuk'];
 
+  myPlayerId = 0;
+  setLocalPlayerId(0);
+
   const players: PlayerSetup[] = [{
     name: hostName,
     kind: 'human',
@@ -817,7 +871,7 @@ document.getElementById('home-btn-start-solo')?.addEventListener('click', () => 
   });
 
   showView('game');
-  render(S, handlers);
+  render(S, handlers, myPlayerId);
   scheduleBot();
   toast('🎲 Solo match vs AI started!', 'emerald');
 });

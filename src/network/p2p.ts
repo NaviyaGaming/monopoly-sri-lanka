@@ -28,9 +28,9 @@ export interface LobbySettings {
 
 export type NetMessage =
   | { type: 'join'; name: string; tokenKey: string }
-  | { type: 'welcome'; playerId: number; state: GameState }
+  | { type: 'welcome'; playerId: number; state?: GameState | null }
   | { type: 'state'; state: GameState }
-  | { type: 'action'; fnName: string; args: any[] }
+  | { type: 'action'; fnName: string; args: any[]; playerId?: number }
   | { type: 'chat'; sender: string; text: string; time: string }
   | { type: 'emote'; sender: string; emoji: string }
   | { type: 'lobby_update'; players: LobbyPlayer[]; settings: LobbySettings }

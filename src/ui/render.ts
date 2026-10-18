@@ -55,11 +55,20 @@ export type TabId = 'deed' | 'bank' | 'insure' | 'trade' | 'log';
 let activeTab: TabId = 'deed';
 let diceClickHandler: (() => void) | null = null;
 let landedSquare: number | null = null;
+let localPlayerId: number | null = null;
 
 export function setActiveTab(tab: string): void {
   if (['deed', 'bank', 'insure', 'trade', 'log'].includes(tab)) {
     activeTab = tab as TabId;
   }
+}
+
+export function setLocalPlayerId(id: number | null): void {
+  localPlayerId = id;
+}
+
+export function getLocalPlayerId(): number | null {
+  return localPlayerId;
 }
 
 export function setDiceClickHandler(fn: (() => void) | null): void {
@@ -89,7 +98,8 @@ function gridPos(i: number): { row: number; col: number } {
 
 // ─── Full render ──────────────────────────────────────────────────────────
 
-export function render(s: GameState, h: Handlers): void {
+export function render(s: GameState, h: Handlers, myId?: number | null): void {
+  if (myId !== undefined) localPlayerId = myId;
   renderHeader(s);
   renderBoard(s, h);
   renderScoreboard(s, h);
@@ -215,11 +225,15 @@ function renderBoard(s: GameState, h: Handlers): void {
 
   const holder = center.querySelector<HTMLElement>('#dice-holder')!;
   void renderDice(holder, s.lastRoll);
-  const humanPreRoll = s.phase === 'preRoll' && cur(s).kind === 'human';
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
+  const humanPreRoll = s.phase === 'preRoll' && cur(s).kind === 'human' && isMyTurn;
   if (humanPreRoll && diceClickHandler) {
     holder.classList.add('clickable');
     holder.title = '🎲 Click dice to roll!';
     holder.addEventListener('click', () => diceClickHandler!());
+  } else {
+    holder.classList.remove('clickable');
+    holder.title = isMyTurn ? '' : `⏳ ${cur(s).name}'s turn`;
   }
 
   renderHubCard(s, h);
@@ -242,6 +256,7 @@ function renderHubCard(s: GameState, h: Handlers): void {
   if (s.phase === 'gameOver') return;
 
   const p = cur(s);
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
   if (p.kind === 'bot') {
     card.innerHTML = `<div class="ctx-card ai"><span class="ai-icon">${TOKENS[p.tokenKey].icon}</span><div><b>${p.name}</b><span class="dim">${t('aiThinking')}</span></div></div>`;
     return;
@@ -253,6 +268,11 @@ function renderHubCard(s: GameState, h: Handlers): void {
 
   switch (s.phase) {
     case 'preRoll': {
+      if (!isMyTurn) {
+        card.innerHTML = `<div class="ctx-card"><div><b>🎲 ${p.name}'s Turn</b><span class="dim">Waiting for ${p.name} to roll the dice...</span></div></div>`;
+        actions.innerHTML = `<div class="waiting-turn-banner"><span class="pulse-dot"></span> Waiting for <b>${p.name}</b> to roll...</div>`;
+        break;
+      }
       if (p.inJail) {
         card.innerHTML = `<div class="ctx-card amber"><div><b>⚖️ CID Inquiry</b><span class="dim">Attempt ${p.jailTurns}/3 — roll doubles or pay bail.</span></div></div>`;
         actions.innerHTML = `
@@ -286,11 +306,15 @@ function renderHubCard(s: GameState, h: Handlers): void {
             <div class="dim perk">🌟 ${perk}</div>
           </div>
         </div>`;
-      actions.innerHTML = `
-        <button class="btn primary" id="btn-buy" ${afford ? '' : 'disabled'}>🏠 ${t('buyProp')} · LKR ${fmt(price)}</button>
-        <button class="btn danger" id="btn-pass">🔨 ${t('auctionInstead')}</button>`;
-      bind('btn-buy', h.onBuy);
-      bind('btn-pass', h.onPass);
+      if (!isMyTurn) {
+        actions.innerHTML = `<div class="waiting-turn-banner"><span class="pulse-dot"></span> Waiting for <b>${p.name}</b> to buy or auction...</div>`;
+      } else {
+        actions.innerHTML = `
+          <button class="btn primary" id="btn-buy" ${afford ? '' : 'disabled'}>🏠 ${t('buyProp')} · LKR ${fmt(price)}</button>
+          <button class="btn danger" id="btn-pass">🔨 ${t('auctionInstead')}</button>`;
+        bind('btn-buy', h.onBuy);
+        bind('btn-pass', h.onPass);
+      }
       break;
     }
     case 'postRoll': {
@@ -304,39 +328,45 @@ function renderHubCard(s: GameState, h: Handlers): void {
       } else if (st.damaged && st.owner === p.id) {
         ctx = `<div class="ctx-card rose"><div><b>⚠️ ${def.name} is storm-damaged</b><span class="dim">Rent suspended — repair for LKR 800 (Deed tab).</span></div></div>`;
       } else if (s.cardJustDrawn) {
-        ctx = cardPopupHtml(s);
+        ctx = cardPopupHtml(s, isMyTurn);
       } else {
-        ctx = `<div class="ctx-card"><div><b>${TOKENS[p.tokenKey].icon} ${p.name}'s turn</b><span class="dim">Build, shield, bank or trade — then end your turn.</span></div></div>`;
+        ctx = `<div class="ctx-card"><div><b>${TOKENS[p.tokenKey].icon} ${p.name}'s turn</b><span class="dim">${isMyTurn ? 'Build, shield, bank or trade — then end your turn.' : `${p.name} is managing their empire...`}</span></div></div>`;
       }
       card.innerHTML = ctx;
 
-      let transit = '';
-      if (canExpressTransit(s)) {
-        transit = `<button class="btn small" id="btn-transit-unowned">🛺 → Unowned</button><button class="btn small" id="btn-transit-bank">🏦 → Bank</button>`;
-      }
-      const endBtnText = s.hasBonusRoll ? '🎲 Roll Again (Doubles Bonus!)' : t('endTurn');
-      actions.innerHTML = `${transit}<button class="btn primary${s.hasBonusRoll ? ' gold' : ''}" id="btn-end">${endBtnText}</button>`;
-      bind('btn-end', h.onEndTurn);
-      bind('btn-transit-unowned', () => h.onTransit('unowned'));
-      bind('btn-transit-bank', () => h.onTransit('bank'));
-      if (s.cardJustDrawn) {
-        const ok = document.getElementById('btn-card-ok');
-        ok?.addEventListener('click', h.onCardOk);
+      if (!isMyTurn) {
+        actions.innerHTML = `<div class="waiting-turn-banner"><span class="pulse-dot"></span> Waiting for <b>${p.name}</b> to finish turn...</div>`;
+      } else {
+        let transit = '';
+        if (canExpressTransit(s)) {
+          transit = `<button class="btn small" id="btn-transit-unowned">🛺 → Unowned</button><button class="btn small" id="btn-transit-bank">🏦 → Bank</button>`;
+        }
+        const endBtnText = s.hasBonusRoll ? '🎲 Roll Again (Doubles Bonus!)' : t('endTurn');
+        actions.innerHTML = `${transit}<button class="btn primary${s.hasBonusRoll ? ' gold' : ''}" id="btn-end">${endBtnText}</button>`;
+        bind('btn-end', h.onEndTurn);
+        bind('btn-transit-unowned', () => h.onTransit('unowned'));
+        bind('btn-transit-bank', () => h.onTransit('bank'));
+        if (s.cardJustDrawn) {
+          const ok = document.getElementById('btn-card-ok');
+          ok?.addEventListener('click', h.onCardOk);
+        }
       }
       break;
     }
   }
 }
 
-function cardPopupHtml(s: GameState): string {
+function cardPopupHtml(s: GameState, isMyTurn = true): string {
   const c = s.cardJustDrawn!;
   const isCommunity = c.deck === 'community';
   const card = isCommunity ? COMMUNITY_CARDS[c.index] : HEADLINE_CARDS[c.index];
   const deltaText = isCommunity && c.delta !== 0 ? `<div class="card-delta ${c.delta > 0 ? 'up' : 'down'}">${c.delta > 0 ? '+' : ''}LKR ${fmt(c.delta)}</div>` : '';
-
+  const okBtn = isMyTurn
+    ? `<button class="btn btn-card-claim" id="btn-card-ok">Collect & Continue ➜</button>`
+    : `<button class="btn btn-card-claim" disabled style="opacity:0.6;cursor:default;">Waiting for ${cur(s).name}...</button>`;
   return `
     <div class="deck-flip-wrapper">
-      <div class="flip-card-inner">
+      <div class="flip-card-inner is-flipped">
         <div class="flip-card-front ${isCommunity ? 'front-community' : 'front-headline'}">
           <div class="seal-ring">${isCommunity ? '🪷' : '📰'}</div>
           <div class="seal-label">${isCommunity ? 'COMMUNITY FUND' : 'ISLAND HEADLINE'}</div>
@@ -347,7 +377,7 @@ function cardPopupHtml(s: GameState): string {
           <h3 class="card-headline-title">${card.title}</h3>
           <p class="card-desc">${card.text}</p>
           ${deltaText}
-          <button class="btn btn-card-claim" id="btn-card-ok">Collect & Continue ➜</button>
+          ${okBtn}
         </div>
       </div>
     </div>`;
@@ -360,15 +390,17 @@ function renderScoreboard(s: GameState, h: Handlers): void {
   const alive = s.players.filter(p => !p.bankrupt);
   const topNet = alive.length > 1 ? Math.max(...alive.map(p => netWorth(s, p.id))) : 0;
   const cardsHtml = s.players.map((p, i) => {
+    const isMe = localPlayerId !== null && i === localPlayerId;
     const props = s.squares.filter(st => st.owner === p.id).length;
     const crown = !p.bankrupt && topNet > 0 && netWorth(s, p.id) === topNet ? ' 👑' : '';
+    const youTag = isMe ? '<span class="you-badge">YOU</span>' : '';
     const badges = `${p.inJail ? '🚔' : ''}${p.loan > 0 ? `🏦${p.loanRoundsLeft}R` : ''}${p.bankrupt ? ' 💀' : ''}`;
     return `
-      <div class="pcard${i === s.current && s.phase !== 'gameOver' ? ' current' : ''}${p.bankrupt ? ' bankrupt' : ''}" style="--pc:${p.color}">
+      <div class="pcard${i === s.current && s.phase !== 'gameOver' ? ' current' : ''}${p.bankrupt ? ' bankrupt' : ''}${isMe ? ' is-me' : ''}" style="--pc:${p.color}">
         <span class="picon">${TOKENS[p.tokenKey].icon}</span>
         <div class="pinfo">
-          <div class="pname">${p.name}${crown} <span class="pbadges">${badges}</span></div>
-          <div class="psub">${p.kind === 'bot' ? PERSONAS[p.persona].label : 'Tycoon'} · ${props} props · Net LKR ${fmt(netWorth(s, p.id))}</div>
+          <div class="pname">${p.name}${youTag}${crown} <span class="pbadges">${badges}</span></div>
+          <div class="psub">${p.kind === 'bot' ? PERSONAS[p.persona].label : (isMe ? 'You (Tycoon)' : 'Tycoon')} · ${props} props · Net LKR ${fmt(netWorth(s, p.id))}</div>
         </div>
         <div class="pcash">LKR ${fmt(p.cash)}</div>
       </div>
@@ -422,7 +454,8 @@ function renderDeedTab(s: GameState, h: Handlers): void {
   const st = s.squares[idx];
   const owner = st.owner !== null ? s.players[st.owner] : null;
   const p = cur(s);
-  const isOwner = s.phase === 'postRoll' && p.kind === 'human' && st.owner === p.id;
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
+  const isOwner = s.phase === 'postRoll' && p.kind === 'human' && st.owner === p.id && isMyTurn;
 
   if (def.kind === 'property' && def.rents && def.group) {
     const g = GROUPS[def.group];
@@ -491,7 +524,8 @@ function renderDeedTab(s: GameState, h: Handlers): void {
 function renderBankTab(s: GameState, h: Handlers): void {
   const box = document.getElementById('bank-content')!;
   const p = cur(s);
-  const isHumanTurn = p.kind === 'human' && s.phase === 'postRoll';
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
+  const isHumanTurn = p.kind === 'human' && s.phase === 'postRoll' && isMyTurn;
   const rate = effectiveLoanRate(s);
   const maxB = maxBorrowLimit(s, p.id);
   document.getElementById('bank-rate-pill')!.textContent = `${rate}% Flat${BOARD[p.position].kind === 'bank' ? ' (On-Square!)' : ''}`;
@@ -522,7 +556,8 @@ function renderBankTab(s: GameState, h: Handlers): void {
 function renderShieldTab(s: GameState, h: Handlers): void {
   const box = document.getElementById('insure-content')!;
   const p = cur(s);
-  const isHumanTurn = p.kind === 'human' && s.phase === 'postRoll';
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
+  const isHumanTurn = p.kind === 'human' && s.phase === 'postRoll' && isMyTurn;
   const owned = s.squares.map((st, i) => ({ st, i })).filter(o => o.st.owner === p.id && BOARD[o.i].kind === 'property');
 
   if (owned.length === 0) {
@@ -567,7 +602,8 @@ function renderShieldTab(s: GameState, h: Handlers): void {
 function renderTradeTab(s: GameState, h: Handlers): void {
   const box = document.getElementById('trade-content')!;
   const p = cur(s);
-  const isHumanTurn = p.kind === 'human' && s.phase === 'postRoll';
+  const isMyTurn = (localPlayerId === null) || (s.current === localPlayerId);
+  const isHumanTurn = p.kind === 'human' && s.phase === 'postRoll' && isMyTurn;
   if (!isHumanTurn) {
     box.innerHTML = '<p class="dim note">The trade desk opens during your action phase.</p>';
     return;
@@ -654,7 +690,8 @@ function renderOverlay(s: GameState, h: Handlers): void {
     const a = s.auction!;
     const def = BOARD[a.square];
     const bidder = s.players[auctionCurrentBidder(s)];
-    const isHumanBidder = bidder.kind === 'human';
+    const isMyTurnToBid = (localPlayerId === null) || (bidder.id === localPlayerId);
+    const isHumanBidder = bidder.kind === 'human' && isMyTurnToBid;
     const nextMin = auctionNextAmount(s);
     const isLeader = a.leader !== null;
     const gcolor = def.group ? GROUPS[def.group].color : '#10b981';
@@ -685,7 +722,7 @@ function renderOverlay(s: GameState, h: Handlers): void {
             </div>
 
             <div class="bidder-status-line">
-              ${isHumanBidder ? `⭐ <b>${bidder.name}</b>, your turn to bid!` : `⏳ Waiting for <b>${bidder.name}</b>...`}
+              ${isHumanBidder ? `⭐ <b>${bidder.name}</b>, your turn to bid!` : `⏳ Waiting for <b>${bidder.name}</b> to bid...`}
             </div>
 
             ${isHumanBidder ? `
@@ -732,18 +769,22 @@ function renderOverlay(s: GameState, h: Handlers): void {
         </div>
       </div>`;
 
-    bind('btn-bid-250', () => h.onBid(250));
-    bind('btn-bid-500', () => h.onBid(500));
-    bind('btn-bid-1000', () => h.onBid(1000));
-    bind('btn-auction-pass', h.onWithdraw);
+    if (isHumanBidder) {
+      bind('btn-bid-250', () => h.onBid(250));
+      bind('btn-bid-500', () => h.onBid(500));
+      bind('btn-bid-1000', () => h.onBid(1000));
+      bind('btn-auction-pass', h.onWithdraw);
+    }
     return;
   }
 
   if (s.pendingTrade) {
     const o = s.pendingTrade;
     const to = s.players[o.toId];
-    if (to.kind === 'human') {
-      const from = s.players[o.fromId];
+    const from = s.players[o.fromId];
+    const isTargetMe = (localPlayerId === null) || (to.id === localPlayerId);
+
+    if (to.kind === 'human' && isTargetMe) {
       ov.classList.remove('hidden');
       ov.innerHTML = `
         <div class="dialog pop">
@@ -757,6 +798,15 @@ function renderOverlay(s: GameState, h: Handlers): void {
         </div>`;
       bind('btn-trade-accept', h.onTradeAccept);
       bind('btn-trade-decline', h.onTradeDecline);
+      return;
+    } else if (localPlayerId !== null && o.fromId === localPlayerId) {
+      ov.classList.remove('hidden');
+      ov.innerHTML = `
+        <div class="dialog pop">
+          <h2>🤝 Trade Proposal Sent</h2>
+          <p>Waiting for <b>${to.name}</b> to review and accept/decline...</p>
+          <div class="waiting-turn-banner"><span class="pulse-dot"></span> Awaiting response...</div>
+        </div>`;
       return;
     }
   }
