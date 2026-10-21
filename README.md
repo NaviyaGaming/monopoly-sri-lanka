@@ -1,4 +1,4 @@
-# POLA 🏪 — Sri Lankan Property Trading Game
+# Sri Lankan Property Trading Game
 
 **A high-stakes Sri Lankan property trading and economic simulation game — crafted by PixalAI.**
 
