@@ -1,14 +1,25 @@
-// ─── Smooth Beautiful Dice Renderer (Richup.io Style) ───────────────────────
+// ─── Realistic 3D Six-Sided Casino Dice Engine (RICHUP Style) ──────────────
 // Features:
-// - Tactile porcelain rounded-square dice with subtle bevel & drop shadows
-// - Deep engraved pips with authentic casino ruby-red dot for 1
-// - Organic natural resting angles (-2.5° and +3°)
-// - Rapid tumbling animation with dynamic face cycling and physical bounce
-// - Elegant doubles celebratory ring (no blown-out wash)
-// - Interactive hover lift on player's turn
+// - Physical 3D CSS cubes with 6 realistic faces (1 to 6)
+// - Opposite faces sum to 7 (1 vs 6, 2 vs 5, 3 vs 4)
+// - Precision pips with luxury casino ruby-red center dot for 1
+// - Multi-axis tumbling, elevation lift, and dynamic floor shadows
+// - Natural organic resting tilts (-3.5° and +4°)
+// - Elastic impact bounce with synthesized landing thud
+// - Doubles celebratory ring and prominent result display
+
+import { sfx } from './fx';
 
 let shown: [number, number] = [3, 4];
 let isRolling = false;
+
+export function isDiceRolling(): boolean {
+  return isRolling;
+}
+
+export function getCurrentRoll(): [number, number] {
+  return [shown[0], shown[1]];
+}
 
 // Pip positions on a 3x3 grid (row, col)
 const PIP_CONFIG: Record<number, Array<[number, number]>> = {
@@ -20,10 +31,20 @@ const PIP_CONFIG: Record<number, Array<[number, number]>> = {
   6: [[1, 1], [1, 3], [2, 1], [2, 3], [3, 1], [3, 3]],
 };
 
-function createDieFace(value: number): HTMLElement {
-  const die = document.createElement('div');
-  die.className = 'richup-die';
-  die.dataset.val = String(value);
+// Target rotations to bring face N front and center to the player
+const FACE_ROTATIONS: Record<number, { x: number; y: number }> = {
+  1: { x: 0, y: 0 },
+  6: { x: 0, y: 180 },
+  2: { x: -90, y: 0 },
+  5: { x: 90, y: 0 },
+  3: { x: 0, y: -90 },
+  4: { x: 0, y: 90 },
+};
+
+function createFaceElement(value: number): HTMLElement {
+  const face = document.createElement('div');
+  face.className = `die-face face-${value}`;
+  face.dataset.face = String(value);
 
   const pips = PIP_CONFIG[value] || PIP_CONFIG[1];
   const isOne = value === 1;
@@ -33,26 +54,22 @@ function createDieFace(value: number): HTMLElement {
     pip.className = `die-pip${isOne ? ' pip-red' : ''}`;
     pip.style.gridRow = String(r);
     pip.style.gridColumn = String(c);
-    die.appendChild(pip);
+    face.appendChild(pip);
   }
 
-  return die;
+  return face;
 }
 
-function updateDieElement(dieEl: HTMLElement, value: number): void {
-  dieEl.innerHTML = '';
-  dieEl.dataset.val = String(value);
+function create3DCube(): HTMLElement {
+  const cube = document.createElement('div');
+  cube.className = 'die-3d-cube';
 
-  const pips = PIP_CONFIG[value] || PIP_CONFIG[1];
-  const isOne = value === 1;
-
-  for (const [r, c] of pips) {
-    const pip = document.createElement('span');
-    pip.className = `die-pip${isOne ? ' pip-red' : ''}`;
-    pip.style.gridRow = String(r);
-    pip.style.gridColumn = String(c);
-    dieEl.appendChild(pip);
+  // Build all 6 physical faces
+  for (let val = 1; val <= 6; val++) {
+    cube.appendChild(createFaceElement(val));
   }
+
+  return cube;
 }
 
 export async function renderDice(
@@ -62,80 +79,125 @@ export async function renderDice(
 ): Promise<void> {
   if (roll) shown = [roll[0], roll[1]];
 
-  // If rolling is in progress, avoid double trigger
+  // If rolling is actively underway, prevent duplicate invocations
   if (isRolling && tumbleMs > 0) return;
 
   holder.innerHTML = '';
   holder.className = 'dice-row richup-dice-stage';
 
-  // Wrapper for Die 1 with shadow
+  // Wrapper 1
   const wrap1 = document.createElement('div');
-  wrap1.className = 'die-wrapper die-1';
+  wrap1.className = 'die-3d-wrapper die-1';
   const shadow1 = document.createElement('div');
   shadow1.className = 'die-floor-shadow';
-  const die1 = createDieFace(shown[0]);
-  wrap1.append(shadow1, die1);
+  const cube1 = create3DCube();
+  wrap1.append(shadow1, cube1);
 
-  // Wrapper for Die 2 with shadow
+  // Wrapper 2
   const wrap2 = document.createElement('div');
-  wrap2.className = 'die-wrapper die-2';
+  wrap2.className = 'die-3d-wrapper die-2';
   const shadow2 = document.createElement('div');
   shadow2.className = 'die-floor-shadow';
-  const die2 = createDieFace(shown[1]);
-  wrap2.append(shadow2, die2);
+  const cube2 = create3DCube();
+  wrap2.append(shadow2, cube2);
 
-  holder.append(wrap1, wrap2);
+  const scene = document.createElement('div');
+  scene.className = 'dice-3d-scene';
+  scene.append(wrap1, wrap2);
 
+  holder.appendChild(scene);
+
+  const rot1 = FACE_ROTATIONS[shown[0]] || { x: 0, y: 0 };
+  const rot2 = FACE_ROTATIONS[shown[1]] || { x: 0, y: 0 };
   const isDoubles = shown[0] === shown[1];
 
   if (tumbleMs > 0) {
     isRolling = true;
     holder.classList.add('is-rolling');
-    die1.classList.add('rolling-tumble-1');
-    die2.classList.add('rolling-tumble-2');
 
-    // Rapid face cycling during roll
-    const intervalTime = 50;
-    const steps = Math.floor(tumbleMs / intervalTime);
-    let stepCount = 0;
+    // Lift cubes and floor shadows into 3D roll state
+    shadow1.classList.add('shadow-rolling');
+    shadow2.classList.add('shadow-rolling');
 
+    // Dynamic 3D spinning transitions
+    const spinX1 = 720;
+    const spinY1 = 1080;
+    const spinX2 = -720;
+    const spinY2 = 1440;
+
+    cube1.style.transition = `transform ${tumbleMs * 0.85}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+    cube2.style.transition = `transform ${tumbleMs * 0.85}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+
+    // Initial launch & multi-spin
+    cube1.style.transform = `translateY(-38px) translateZ(30px) rotateX(${spinX1 + rot1.x}deg) rotateY(${spinY1 + rot1.y}deg) rotateZ(-180deg)`;
+    cube2.style.transform = `translateY(-42px) translateZ(32px) rotateX(${spinX2 + rot2.x}deg) rotateY(${spinY2 + rot2.y}deg) rotateZ(180deg)`;
+
+    // Settle down to table with realistic deceleration
     await new Promise<void>((resolve) => {
-      const interval = setInterval(() => {
-        stepCount++;
-        const temp1 = Math.floor(Math.random() * 6) + 1;
-        const temp2 = Math.floor(Math.random() * 6) + 1;
-        updateDieElement(die1, temp1);
-        updateDieElement(die2, temp2);
+      setTimeout(() => {
+        cube1.style.transition = 'transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        cube2.style.transition = 'transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)';
 
-        if (stepCount >= steps) {
-          clearInterval(interval);
-          updateDieElement(die1, shown[0]);
-          updateDieElement(die2, shown[1]);
+        cube1.style.transform = `translateY(0) rotateX(${rot1.x}deg) rotateY(${rot1.y}deg) rotateZ(-3.5deg)`;
+        cube2.style.transform = `translateY(0) rotateX(${rot2.x}deg) rotateY(${rot2.y}deg) rotateZ(4deg)`;
+
+        shadow1.classList.remove('shadow-rolling');
+        shadow2.classList.remove('shadow-rolling');
+
+        sfx('dice_land');
+
+        setTimeout(() => {
+          holder.classList.remove('is-rolling');
+          isRolling = false;
+
+          if (isDoubles) {
+            holder.classList.add('doubles-ring');
+            sfx('fanfare');
+            setTimeout(() => holder.classList.remove('doubles-ring'), 2200);
+          }
           resolve();
-        }
-      }, intervalTime);
+        }, 300);
+      }, tumbleMs * 0.85);
     });
-
-    // Impact settle bounce
-    die1.classList.remove('rolling-tumble-1');
-    die2.classList.remove('rolling-tumble-2');
-    die1.classList.add('settle-bounce');
-    die2.classList.add('settle-bounce');
-
-    setTimeout(() => {
-      die1.classList.remove('settle-bounce');
-      die2.classList.remove('settle-bounce');
-      holder.classList.remove('is-rolling');
-      isRolling = false;
-
-      if (isDoubles) {
-        holder.classList.add('doubles-ring');
-        setTimeout(() => holder.classList.remove('doubles-ring'), 2200);
-      }
-    }, 280);
   } else {
+    // Resting position
+    cube1.style.transform = `rotateX(${rot1.x}deg) rotateY(${rot1.y}deg) rotateZ(-3.5deg)`;
+    cube2.style.transform = `rotateX(${rot2.x}deg) rotateY(${rot2.y}deg) rotateZ(4deg)`;
     if (isDoubles) {
       holder.classList.add('doubles-ring');
     }
   }
+
+  // Append Prominent Dice Result Banner
+  renderResultDisplay(holder, shown, isDoubles, tumbleMs > 0);
+}
+
+function renderResultDisplay(
+  holder: HTMLElement,
+  dice: [number, number],
+  isDoubles: boolean,
+  animated = false,
+): void {
+  // Remove existing result banner if present
+  const existing = holder.querySelector('.dice-result-container');
+  if (existing) existing.remove();
+
+  const container = document.createElement('div');
+  container.className = `dice-result-container${animated ? ' anim-slide-in' : ''}`;
+  const total = dice[0] + dice[1];
+
+  container.innerHTML = `
+    <div class="dice-result-meta">
+      <span class="dice-val-pill">DICE 1: <b>${dice[0]}</b></span>
+      <span class="dice-divider">+</span>
+      <span class="dice-val-pill">DICE 2: <b>${dice[1]}</b></span>
+      <span class="dice-total-pill">TOTAL: <b>${total}</b></span>
+    </div>
+    ${isDoubles ? `
+      <div class="dice-doubles-callout">
+        <span>🎲 DOUBLES! (${dice[0]}+${dice[1]}) — Bonus turn granted!</span>
+      </div>` : ''}
+  `;
+
+  holder.appendChild(container);
 }

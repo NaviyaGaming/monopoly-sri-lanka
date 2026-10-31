@@ -90,7 +90,17 @@ async function perform(fn: (s: GameState) => void): Promise<void> {
     if (rolled && s.lastRoll) {
       sfx('dice');
       const holder = document.getElementById('dice-holder');
-      if (holder) await renderDice(holder, s.lastRoll, fastMode ? 300 : 720);
+      const rollBtn = document.getElementById('btn-roll') as HTMLButtonElement | null;
+      if (rollBtn) {
+        rollBtn.disabled = true;
+        rollBtn.textContent = '🎲 ROLLING...';
+      }
+      const dockRollBtn = document.getElementById('dock-btn-roll') as HTMLButtonElement | null;
+      if (dockRollBtn) {
+        dockRollBtn.disabled = true;
+        dockRollBtn.textContent = '🎲 ROLLING...';
+      }
+      if (holder) await renderDice(holder, s.lastRoll, fastMode ? 320 : 1200);
       if (s.lastRoll[0] === s.lastRoll[1] && s.players[before.actor].kind === 'bot') {
         triggerBotBanter(s.players[before.actor].persona, before.actor, 'roll_doubles');
       }
@@ -869,7 +879,7 @@ document.getElementById('lobby-btn-start-game')?.addEventListener('click', () =>
   const cashSel = document.getElementById('lobby-set-cash') as HTMLSelectElement;
   const roundsSel = document.getElementById('lobby-set-rounds') as HTMLSelectElement;
   const startingCash = cashSel ? parseInt(cashSel.value, 10) : 30000;
-  const maxRounds = roundsSel ? parseInt(roundsSel.value, 10) : 25;
+  const maxRounds = roundsSel && roundsSel.value !== '' ? parseInt(roundsSel.value, 10) : 0;
 
   const personas: (keyof typeof PERSONAS)[] = ['aggressive', 'conservative', 'risk', 'opportunist', 'aggressive', 'conservative'];
 
@@ -983,7 +993,8 @@ document.getElementById('home-btn-start-solo')?.addEventListener('click', () => 
   sfx('click');
 
   const pCount = parseInt((document.getElementById('home-solo-players') as HTMLSelectElement).value, 10) || 4;
-  const rounds = parseInt((document.getElementById('home-solo-rounds') as HTMLSelectElement).value, 10) || 25;
+  const rawRounds = (document.getElementById('home-solo-rounds') as HTMLSelectElement)?.value;
+  const rounds = rawRounds !== undefined && rawRounds !== '' ? parseInt(rawRounds, 10) : 0;
   const cash = parseInt((document.getElementById('home-solo-cash') as HTMLSelectElement).value, 10) || 30000;
   const hostName = (document.getElementById('home-host-name') as HTMLInputElement)?.value.trim() || 'Navindu';
 

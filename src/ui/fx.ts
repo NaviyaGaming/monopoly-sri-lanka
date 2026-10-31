@@ -46,7 +46,7 @@ function voice(
 }
 
 export type SfxName =
-  | 'dice' | 'step' | 'tuktuk' | 'dancer' | 'elephant' | 'train'
+  | 'dice' | 'dice_land' | 'step' | 'tuktuk' | 'dancer' | 'elephant' | 'train'
   | 'buy' | 'cash' | 'gavel' | 'fanfare' | 'alert' | 'click' | 'win'
   | 'cardflip' | 'tuktuk_ride' | 'emote' | 'gem' | 'tick';
 
@@ -61,6 +61,10 @@ export function sfx(name: SfxName): void {
         voice('triangle', 220 + i * 55, 480 + i * 40, offset, 0.055, 0.11);
         voice('square', 140 + i * 25, 95, offset, 0.04, 0.04);
       });
+      break;
+    case 'dice_land': // solid felt/wood table impact thud
+      voice('triangle', 180, 55, 0, 0.07, 0.15);
+      voice('sine', 110, 45, 0, 0.09, 0.12);
       break;
     case 'step': // token hop footstep
       voice('sine', 340, 590, 0, 0.065, 0.09);

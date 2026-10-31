@@ -140,40 +140,43 @@ export function chargeCash(
     }
   });
 
-  // 4. Surrender remaining properties to the bank at mortgage value.
-  s.squares.forEach((st, i) => {
-    if (st.owner !== playerId || p.cash >= 0) return;
-    if (st.loanLocked) return; // already collateral
-    const val = BOARD[i].mortgageValue ?? Math.round((BOARD[i].price ?? 2000) * 0.5);
-    st.owner = null;
-    st.buildings = 0;
-    st.shield = 0;
-    st.loanLocked = false;
-    st.damaged = false;
-    st.mortgaged = false;
-    p.cash += val;
-    log(s, `⚠️ ${p.name} surrendered ${BOARD[i].name} to the bank for LKR ${fmt(val)}.`, 'danger');
-  });
-
+  // If cash is still negative, player is bankrupt!
   if (p.cash < 0) {
     p.bankrupt = true;
-    p.cash = 0;
     p.loan = 0;
     p.loanRoundsLeft = 0;
-    s.squares.forEach(st => {
-      if (st.owner === playerId) {
-        st.owner = null;
-        st.buildings = 0;
-        st.shield = 0;
-        st.loanLocked = false;
-        st.damaged = false;
-        st.mortgaged = false;
-      }
-    });
+
+    if (to.type === 'player') {
+      const creditor = s.players[to.id];
+      if (p.cash > 0) creditor.cash += p.cash;
+      let propsTransferred = 0;
+      s.squares.forEach(st => {
+        if (st.owner === playerId) {
+          st.owner = to.id;
+          st.loanLocked = false;
+          propsTransferred++;
+        }
+      });
+      log(s, `💥 BANKRUPTCY! ${p.name} was bankrupted by ${creditor.name}! Transferred ${propsTransferred} properties to ${creditor.name}.`, 'danger');
+    } else {
+      s.squares.forEach(st => {
+        if (st.owner === playerId) {
+          st.owner = null;
+          st.buildings = 0;
+          st.shield = 0;
+          st.loanLocked = false;
+          st.damaged = false;
+          st.mortgaged = false;
+          st.condition = 100;
+        }
+      });
+      log(s, `💥 BANKRUPTCY! ${p.name} has been eliminated by debts to the Bank/State. Properties returned to bank reserve.`, 'danger');
+    }
+
+    p.cash = 0;
     if (s.auction && s.auction.participants.includes(playerId)) {
       s.auction.participants = s.auction.participants.filter(id => id !== playerId);
     }
-    log(s, `💥 BANKRUPTCY! ${p.name} has been eliminated from the island economy.`, 'danger');
     checkGameOver(s);
     return false;
   }
@@ -884,10 +887,26 @@ function processEndOfRound(s: GameState): void {
       values: s.players.map(pl => netWorth(s, pl.id)),
     });
   }
-  if (s.round > s.maxRounds) {
-    s.round = s.maxRounds;
-    gameOverByWorth(s);
-    return;
+  if (s.maxRounds > 0 && s.round > s.maxRounds) {
+    const solvent = s.players.filter(p => !p.bankrupt);
+    if (solvent.length <= 1) {
+      checkGameOver(s);
+      return;
+    }
+    // Sudden Death: Never declare a winner simply because of highest balance while 2+ players remain.
+    // Accelerate living costs and municipal tariffs until only ONE tycoon survives!
+    log(s, `⚡ SUDDEN DEATH! Round ${s.maxRounds} exceeded. Economic tariffs surge until only ONE surviving tycoon remains!`, 'danger');
+    for (const pl of solvent) {
+      if (!pl.bankrupt) {
+        // As soon as only one solvent player remains, they are the winner! Do not eliminate them.
+        const remainingSolvent = s.players.filter(p => !p.bankrupt);
+        if (remainingSolvent.length <= 1) break;
+
+        const levy = Math.round(pl.cash * 0.4) + 1500;
+        chargeCash(s, pl.id, levy, { type: 'pool' });
+        if (checkGameOver(s)) return;
+      }
+    }
   }
 
   // Rule-LK 25: Building Condition Rating degrades by 2% at the end of every round
@@ -943,7 +962,7 @@ export function checkGameOver(s: GameState): boolean {
   if (solvent.length <= 1 && s.phase !== 'gameOver') {
     s.winner = solvent.length === 1 ? solvent[0].id : null;
     s.phase = 'gameOver';
-    log(s, solvent.length === 1 ? `🏆 ${solvent[0].name} is the last tycoon standing — GAME OVER.` : 'Everyone is bankrupt. The bank wins.', 'event');
+    log(s, solvent.length === 1 ? `🏆 ${solvent[0].name} is the last financially surviving tycoon — VICTORY! 👑` : 'Everyone is bankrupt. The bank wins.', 'event');
     return true;
   }
   return false;

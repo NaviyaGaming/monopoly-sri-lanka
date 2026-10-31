@@ -380,13 +380,13 @@ function renderHubCard(s: GameState, h: Handlers): void {
       }
       if (p.inJail) {
         actions.innerHTML = `
-          <button class="btn btn-richup-pill primary" id="btn-roll">🎲 Roll the dice</button>
+          <button class="btn btn-richup-pill primary hero" id="btn-roll">🎲 ROLL DICE</button>
           <button class="btn btn-richup-pill outline" id="btn-bail" ${p.cash < 500 ? 'disabled' : ''}>⚖️ Pay bail ($500)</button>`;
         bind('btn-roll', () => { sfx('dice'); h.onRoll(); });
         bind('btn-bail', () => { sfx('click'); h.onBail(); });
       } else {
         actions.innerHTML = `
-          <button class="btn btn-richup-pill primary hero" id="btn-roll">🎲 Roll the dice</button>`;
+          <button class="btn btn-richup-pill primary hero" id="btn-roll">🎲 ROLL DICE</button>`;
         bind('btn-roll', () => { sfx('dice'); h.onRoll(); });
       }
       break;
@@ -1340,12 +1340,33 @@ function renderOverlay(s: GameState, h: Handlers): void {
     const career = loadCareer();
     const rank = getTycoonRank(career);
 
+    const winnerProps = s.winner !== null
+      ? s.squares
+          .map((st, idx) => ({ st, def: BOARD[idx] }))
+          .filter(item => item.st.owner === s.winner)
+      : [];
+
+    const winnerPropsHtml = winnerProps.length > 0
+      ? `
+        <div class="winner-assets-section">
+          <h4>🏛️ Acquired Island Portfolio (${winnerProps.length} Properties)</h4>
+          <div class="winner-assets-chips">
+            ${winnerProps.map(wp => `
+              <span class="winner-asset-chip" style="border-left: 3px solid ${wp.def.group ? GROUPS[wp.def.group].color : '#10b981'}">
+                ${wp.def.icon ?? '📍'} ${wp.def.name}${wp.st.buildings === 5 ? ' 🏨' : (wp.st.buildings > 0 ? ` (${wp.st.buildings}🏠)` : '')}
+              </span>
+            `).join('')}
+          </div>
+        </div>
+      `
+      : '';
+
     ov.classList.remove('hidden');
     ov.innerHTML = `
       <div class="dialog pop game-over-dialog">
         <div class="studio">POLA : MONOPOLY SRI LANKA</div>
-        <h1>${t('champion')}</h1>
-        <p class="winner-line">${s.winner !== null ? `👑 <strong>${s.players[s.winner].name}</strong> dominates the island with LKR ${fmt(netWorth(s, s.winner))}!` : 'Everyone went bankrupt — the bank wins.'}</p>
+        <h1>🏆 ${t('champion')}</h1>
+        <p class="winner-line">${s.winner !== null ? `👑 <strong>${s.players[s.winner].name}</strong> is the <b>Last Financially Surviving Tycoon</b>!<br><span class="winner-meta-sub">Final Cash Balance: <b>LKR ${fmt(s.players[s.winner].cash)}</b> · Liquidated Net Worth: <b>LKR ${fmt(netWorth(s, s.winner))}</b></span>` : 'Everyone went bankrupt — the bank wins.'}</p>
 
         <!-- 🏆 Richup-Style Victory Podium -->
         <div class="podium-container">
@@ -1355,7 +1376,7 @@ function renderOverlay(s: GameState, h: Handlers): void {
                 ${TOKENS[standings[1].tokenKey].icon}
               </div>
               <div class="podium-name">${standings[1].name}</div>
-              <div class="podium-net">LKR ${fmt(netWorth(s, standings[1].id))}</div>
+              <div class="podium-net">${standings[1].bankrupt ? 'Bankrupt 💀' : `LKR ${fmt(netWorth(s, standings[1].id))}`}</div>
               <div class="podium-pedestal p2">
                 <span class="podium-badge">🥈 2nd</span>
               </div>
@@ -1367,9 +1388,9 @@ function renderOverlay(s: GameState, h: Handlers): void {
                 ${TOKENS[standings[0].tokenKey].icon}
               </div>
               <div class="podium-name">${standings[0].name}</div>
-              <div class="podium-net">LKR ${fmt(netWorth(s, standings[0].id))}</div>
+              <div class="podium-net">Cash: LKR ${fmt(standings[0].cash)}</div>
               <div class="podium-pedestal p1">
-                <span class="podium-badge">🥇 1st</span>
+                <span class="podium-badge">🥇 Sole Survivor</span>
               </div>
             </div>` : ''}
           ${standings[2] ? `
@@ -1378,12 +1399,14 @@ function renderOverlay(s: GameState, h: Handlers): void {
                 ${TOKENS[standings[2].tokenKey].icon}
               </div>
               <div class="podium-name">${standings[2].name}</div>
-              <div class="podium-net">LKR ${fmt(netWorth(s, standings[2].id))}</div>
+              <div class="podium-net">${standings[2].bankrupt ? 'Bankrupt 💀' : `LKR ${fmt(netWorth(s, standings[2].id))}`}</div>
               <div class="podium-pedestal p3">
                 <span class="podium-badge">🥉 3rd</span>
               </div>
             </div>` : ''}
         </div>
+
+        ${winnerPropsHtml}
 
         <!-- Career Rank Banner -->
         <div class="game-over-rank-banner ${rank.borderClass}">
@@ -1394,11 +1417,17 @@ function renderOverlay(s: GameState, h: Handlers): void {
           </div>
         </div>
 
-        <div class="standings">${standings.map((p, i) => `
-          <div class="standing-row${i === 0 ? ' winner' : ''}">
-            <span><span class="rank">#${i + 1}</span> ${TOKENS[p.tokenKey].icon} ${p.name}</span>
-            <span>LKR ${fmt(netWorth(s, p.id))}</span>
-          </div>`).join('')}</div>
+        <div class="standings">
+          <h4>📊 Final Player Rankings</h4>
+          ${standings.map((p, i) => `
+          <div class="standing-row${i === 0 ? ' winner' : ''}${p.bankrupt ? ' bankrupt' : ''}">
+            <span>
+              <span class="rank">#${i + 1}</span> ${TOKENS[p.tokenKey].icon} <b>${p.name}</b>
+              ${i === 0 && !p.bankrupt ? '<span class="pill teal" style="margin-left:6px;font-size:10.5px;padding:2px 7px;">Sole Survivor 👑</span>' : (p.bankrupt ? '<span class="pill amber" style="margin-left:6px;font-size:10.5px;padding:2px 7px;">Bankrupt 💀</span>' : '')}
+            </span>
+            <span>Balance: <b>LKR ${fmt(p.cash)}</b> · Net Worth: <b>LKR ${fmt(netWorth(s, p.id))}</b></span>
+          </div>`).join('')}
+        </div>
 
         <!-- 📈 Net Worth Timeline Progression Graph -->
         ${generateNetWorthSvg(s)}
@@ -1406,8 +1435,7 @@ function renderOverlay(s: GameState, h: Handlers): void {
         <!-- 🏆 Match Accolades -->
         ${generateAccoladesHtml(s)}
 
-        ${s.players.some(p => p.bankrupt) ? `<p class="dim fell-along">Fell along the way: ${s.players.filter(p => p.bankrupt).map(p => p.name).join(', ')}.</p>` : ''}
-        <button class="btn btn-richup-pill primary hero btn-large" id="btn-restart" style="margin: 12px auto 0; display: inline-flex;">${t('playAgain')}</button>
+        <button class="btn btn-richup-pill primary hero btn-large" id="btn-restart" style="margin: 14px auto 0; display: inline-flex;">🚀 ${t('playAgain')}</button>
       </div>`;
     confetti(ov);
     bind('btn-restart', () => {

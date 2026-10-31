@@ -37,9 +37,9 @@ var BOARD = [
   prop(3, "Maradana", "Maradana", "brown", 1500, [180, 360, 540, 900, 1260, 1800], 500, 750),
   { index: 4, kind: "tax", name: "Inland Revenue Tax", short: "Tax 1.5k", icon: "\u{1F3DB}\uFE0F", taxAmount: 1500, desc: "Pay LKR 1,500 into the Poya Day Holiday Welfare Pool." },
   { index: 5, kind: "railway", name: "Colombo Fort Station", short: "Fort Rail", icon: "\u{1F682}", price: RAIL_PRICE, mortgageValue: RAIL_MORTGAGE },
-  prop(6, "Bambalapitiya", "Bamba", "lightblue", 2500, [250, 500, 750, 1250, 1750, 2500], 750, 1250),
+  prop(6, "Bambalapitiya", "Bambalapitiya", "lightblue", 2500, [250, 500, 750, 1250, 1750, 2500], 750, 1250),
   { index: 7, kind: "event", name: "Island Headline", short: "Headline", icon: "\u{1F4F0}", desc: "Draw a National Economic Event card." },
-  prop(8, "Wellawatte", "Wella", "lightblue", 2500, [250, 500, 750, 1250, 1750, 2500], 750, 1250),
+  prop(8, "Wellawatte", "Wellawatte", "lightblue", 2500, [250, 500, 750, 1250, 1750, 2500], 750, 1250),
   prop(9, "Mount Lavinia", "Mt Lavinia", "lightblue", 2800, [300, 600, 900, 1500, 2100, 3e3], 750, 1400, true),
   { index: 10, kind: "jail", name: "CID Inquiry", short: "CID / Visit", icon: "\u2696\uFE0F", desc: "Just Visiting unless summoned. Jailed players can pay LKR 500 bail or roll doubles." },
   prop(11, "Nugegoda", "Nugegoda", "pink", 3500, [350, 700, 1050, 1750, 2450, 3500], 1e3, 1750),
@@ -65,7 +65,7 @@ var BOARD = [
   prop(31, "Jaffna Town", "Jaffna Town", "green", 8e3, [800, 1600, 2400, 4e3, 5600, 8e3], 2500, 4e3),
   prop(32, "Nallur", "Nallur", "green", 8e3, [800, 1600, 2400, 4e3, 5600, 8e3], 2500, 4e3),
   { index: 33, kind: "insurance", name: "Ceylinco Insurance", short: "Ceylinco Ins.", icon: "\u{1F6E1}\uFE0F", desc: "Purchase Disaster Insurance Policies (20% discount when standing here)." },
-  prop(34, "Trincomalee", "Trinco", "green", 8500, [850, 1700, 2550, 4250, 5950, 8500], 2500, 4250, true),
+  prop(34, "Trincomalee", "Trincomalee", "green", 8500, [850, 1700, 2550, 4250, 5950, 8500], 2500, 4250, true),
   { index: 35, kind: "railway", name: "Jaffna Railway Station", short: "Jaffna Rail", icon: "\u{1F682}", price: RAIL_PRICE, mortgageValue: RAIL_MORTGAGE },
   { index: 36, kind: "event", name: "National Event Card", short: "Natl Event", icon: "\u{1F4F0}", desc: "Draw a National Economic Event card." },
   prop(37, "Nuwara Eliya", "Nuwara Eliya", "darkblue", 9500, [950, 1900, 2850, 4750, 6650, 9500], 3e3, 4750),
@@ -107,7 +107,7 @@ var HEADLINE_CARDS = [
   { title: "Port City Investment Inflow", text: "Foreign direct investment surges! Pettah and Maradana owners collect LKR 1,800.", effect: { type: "groupBonus", groups: ["brown"], amount: 1800 } },
   { title: "Northern Development Grant", text: "Reconstruction subsidies awarded! Green district owners collect LKR 2,000.", effect: { type: "groupBonus", groups: ["green"], amount: 2e3 } }
 ];
-var SEAT_COLORS = ["#10b981", "#0ea5e9", "#f43f5e", "#a855f7"];
+var SEAT_COLORS = ["#10b981", "#0ea5e9", "#f43f5e", "#a855f7", "#f59e0b", "#06b6d4"];
 
 // src/engine/rng.ts
 function seedRng(seed) {
@@ -272,6 +272,7 @@ function cur(s) {
   return s.players[s.current];
 }
 function createGame(opts) {
+  const startCash = opts.startingCash ?? START_CASH;
   const players = opts.players.map((p, i) => ({
     id: i,
     name: p.name,
@@ -279,7 +280,7 @@ function createGame(opts) {
     persona: p.persona,
     tokenKey: p.tokenKey,
     color: SEAT_COLORS[i % SEAT_COLORS.length],
-    cash: START_CASH,
+    cash: startCash,
     position: 0,
     inJail: false,
     jailTurns: 0,
@@ -311,13 +312,25 @@ function createGame(opts) {
     auction: null,
     pendingBuy: null,
     lastRoll: null,
+    totalRolls: 0,
     selectedSquare: 0,
     cardJustDrawn: null,
     pendingTrade: null,
     consecutiveDoubles: 0,
     hasBonusRoll: false,
     log: [],
-    winner: null
+    winner: null,
+    matchStats: {
+      rentCollected: players.map(() => 0),
+      rentPaid: players.map(() => 0),
+      loansTaken: players.map(() => 0),
+      doublesRolled: players.map(() => 0),
+      shieldsBought: players.map(() => 0)
+    },
+    netWorthHistory: [{
+      round: 1,
+      values: players.map(() => startCash)
+    }]
   };
   s.communityDeck = shuffle(s, COMMUNITY_CARDS.map((_, i) => i));
   s.headlineDeck = shuffle(s, HEADLINE_CARDS.map((_, i) => i));
@@ -360,38 +373,40 @@ function chargeCash(s, playerId, amount, to) {
       log(s, `\u26A0\uFE0F ${p.name} liquidated buildings on ${BOARD[i].name} for LKR ${fmt(refund)}.`, "danger");
     }
   });
-  s.squares.forEach((st, i) => {
-    if (st.owner !== playerId || p.cash >= 0) return;
-    if (st.loanLocked) return;
-    const val = BOARD[i].mortgageValue ?? Math.round((BOARD[i].price ?? 2e3) * 0.5);
-    st.owner = null;
-    st.buildings = 0;
-    st.shield = 0;
-    st.loanLocked = false;
-    st.damaged = false;
-    st.mortgaged = false;
-    p.cash += val;
-    log(s, `\u26A0\uFE0F ${p.name} surrendered ${BOARD[i].name} to the bank for LKR ${fmt(val)}.`, "danger");
-  });
   if (p.cash < 0) {
     p.bankrupt = true;
-    p.cash = 0;
     p.loan = 0;
     p.loanRoundsLeft = 0;
-    s.squares.forEach((st) => {
-      if (st.owner === playerId) {
-        st.owner = null;
-        st.buildings = 0;
-        st.shield = 0;
-        st.loanLocked = false;
-        st.damaged = false;
-        st.mortgaged = false;
-      }
-    });
+    if (to.type === "player") {
+      const creditor = s.players[to.id];
+      if (p.cash > 0) creditor.cash += p.cash;
+      let propsTransferred = 0;
+      s.squares.forEach((st) => {
+        if (st.owner === playerId) {
+          st.owner = to.id;
+          st.loanLocked = false;
+          propsTransferred++;
+        }
+      });
+      log(s, `\u{1F4A5} BANKRUPTCY! ${p.name} was bankrupted by ${creditor.name}! Transferred ${propsTransferred} properties to ${creditor.name}.`, "danger");
+    } else {
+      s.squares.forEach((st) => {
+        if (st.owner === playerId) {
+          st.owner = null;
+          st.buildings = 0;
+          st.shield = 0;
+          st.loanLocked = false;
+          st.damaged = false;
+          st.mortgaged = false;
+          st.condition = 100;
+        }
+      });
+      log(s, `\u{1F4A5} BANKRUPTCY! ${p.name} has been eliminated by debts to the Bank/State. Properties returned to bank reserve.`, "danger");
+    }
+    p.cash = 0;
     if (s.auction && s.auction.participants.includes(playerId)) {
       s.auction.participants = s.auction.participants.filter((id) => id !== playerId);
     }
-    log(s, `\u{1F4A5} BANKRUPTCY! ${p.name} has been eliminated from the island economy.`, "danger");
     checkGameOver(s);
     return false;
   }
@@ -401,6 +416,7 @@ function takeTurnRoll(s) {
   const p = cur(s);
   const d = rollDice(s);
   s.lastRoll = d;
+  s.totalRolls = (s.totalRolls || 0) + 1;
   const sum = d[0] + d[1];
   const isDouble = d[0] === d[1];
   log(s, `${p.name} rolls ${d[0]} + ${d[1]} = ${sum}${isDouble ? " (DOUBLES! \u{1F3B2}\u{1F3B2})" : ""}.`, "info");
@@ -447,6 +463,7 @@ function takeTurnRoll(s) {
       return;
     }
     s.hasBonusRoll = true;
+    if (s.matchStats) s.matchStats.doublesRolled[p.id] = (s.matchStats.doublesRolled[p.id] || 0) + 1;
     log(s, `\u{1F3B2} DOUBLES! ${p.name} gets a bonus roll after completing their turn!`, "event");
   } else {
     s.consecutiveDoubles = 0;
@@ -499,6 +516,10 @@ function resolveLanding(s) {
           const rent = effectiveRent(s, idx, diceSum);
           log(s, `\u{1F4B8} ${p.name} paid LKR ${fmt(rent)} rent to ${owner.name} at ${def.name}.`, "money");
           chargeCash(s, p.id, rent, { type: "player", id: owner.id });
+          if (s.matchStats) {
+            s.matchStats.rentCollected[owner.id] = (s.matchStats.rentCollected[owner.id] || 0) + rent;
+            s.matchStats.rentPaid[p.id] = (s.matchStats.rentPaid[p.id] || 0) + rent;
+          }
         }
         goPostRoll(s);
       } else {
@@ -806,6 +827,7 @@ function buyShield(s, idx, tier) {
   if (p.cash < cost) return false;
   p.cash -= cost;
   st.shield = tier;
+  if (s.matchStats) s.matchStats.shieldsBought[p.id] = (s.matchStats.shieldsBought[p.id] || 0) + 1;
   const label = tier === 3 ? "Business Interruption Policy" : tier === 2 ? "Comprehensive Insurance" : "Basic Property Insurance";
   log(s, `\u{1F6E1}\uFE0F ${p.name} equipped ${label} on ${BOARD[idx].name} for LKR ${fmt(cost)}.`, "money");
   return true;
@@ -832,6 +854,7 @@ function takeLoan(s, amount, playerId) {
   p.cash += principal;
   p.loan = payback;
   p.loanRoundsLeft = LOAN_DURATION;
+  if (s.matchStats) s.matchStats.loansTaken[p.id] = (s.matchStats.loansTaken[p.id] || 0) + principal;
   s.squares.forEach((st, i) => {
     if (st.owner === p.id && BOARD[i].mortgageValue && !st.loanLocked && !st.mortgaged) st.loanLocked = true;
   });
@@ -919,10 +942,28 @@ function isOver(s) {
 }
 function processEndOfRound(s) {
   s.round++;
-  if (s.round > s.maxRounds) {
-    s.round = s.maxRounds;
-    gameOverByWorth(s);
-    return;
+  if (s.netWorthHistory) {
+    s.netWorthHistory.push({
+      round: s.round,
+      values: s.players.map((pl) => netWorth(s, pl.id))
+    });
+  }
+  if (s.maxRounds > 0 && s.round > s.maxRounds) {
+    const solvent = s.players.filter((p) => !p.bankrupt);
+    if (solvent.length <= 1) {
+      checkGameOver(s);
+      return;
+    }
+    log(s, `\u26A1 SUDDEN DEATH! Round ${s.maxRounds} exceeded. Economic tariffs surge until only ONE surviving tycoon remains!`, "danger");
+    for (const pl of solvent) {
+      if (!pl.bankrupt) {
+        const remainingSolvent = s.players.filter((p) => !p.bankrupt);
+        if (remainingSolvent.length <= 1) break;
+        const levy = Math.round(pl.cash * 0.4) + 1500;
+        chargeCash(s, pl.id, levy, { type: "pool" });
+        if (checkGameOver(s)) return;
+      }
+    }
   }
   s.squares.forEach((st, i) => {
     if (st.owner !== null && st.buildings > 0) {
@@ -973,16 +1014,10 @@ function checkGameOver(s) {
   if (solvent.length <= 1 && s.phase !== "gameOver") {
     s.winner = solvent.length === 1 ? solvent[0].id : null;
     s.phase = "gameOver";
-    log(s, solvent.length === 1 ? `\u{1F3C6} ${solvent[0].name} is the last tycoon standing \u2014 GAME OVER.` : "Everyone is bankrupt. The bank wins.", "event");
+    log(s, solvent.length === 1 ? `\u{1F3C6} ${solvent[0].name} is the last financially surviving tycoon \u2014 VICTORY! \u{1F451}` : "Everyone is bankrupt. The bank wins.", "event");
     return true;
   }
   return false;
-}
-function gameOverByWorth(s) {
-  const standings = s.players.filter((p) => !p.bankrupt).sort((a, b) => netWorth(s, b.id) - netWorth(s, a.id));
-  s.winner = standings[0]?.id ?? null;
-  s.phase = "gameOver";
-  log(s, `\u{1F3C6} MATCH COMPLETE at round ${s.maxRounds}. Final standings by net worth: ${standings.map((p) => `${p.name} (LKR ${fmt(netWorth(s, p.id))})`).join(", ")}.`, "event");
 }
 
 // src/engine/bots.ts
